@@ -66,27 +66,87 @@
     <!-- Next Week Status -->
     <div class="bg-white rounded-lg shadow p-6">
         <div class="flex justify-between items-center mb-4">
-            <h3 class="text-lg font-semibold">Tuan sau</h3>
-            <a href="{{ url_for('schedule.register') }}" class="text-blue-600 hover:underline">
-                Dang ky / Sua lich
+            <h3 class="text-lg font-semibold">
+                Tuan sau
+                {% if next_week_start and next_week_end %}
+                <span class="text-sm font-normal text-gray-500">
+                    ({{ next_week_start.strftime('%d/%m') }} - {{ next_week_end.strftime('%d/%m') }})
+                </span>
+                {% endif %}
+            </h3>
+            {% if not next_schedule or next_schedule.status.value != 'approved' %}
+            <a href="{{ url_for('schedule.register') }}" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">
+                {% if next_schedule and next_schedule.status.value == 'draft' %}Sua va gui lai
+                {% elif next_schedule and next_schedule.status.value == 'submitted' %}Sua lich
+                {% else %}Dang ky lich{% endif %}
             </a>
+            {% endif %}
         </div>
 
         {% if next_schedule %}
-        <div class="p-4 rounded-lg
+        <div class="p-4 rounded-lg mb-4
             {% if next_schedule.status.value == 'approved' %}bg-green-100 text-green-700
             {% elif next_schedule.status.value == 'submitted' %}bg-blue-100 text-blue-700
-            {% else %}bg-gray-100 text-gray-700{% endif %}">
+            {% else %}bg-yellow-100 text-yellow-700{% endif %}">
 
             {% if next_schedule.status.value == 'approved' %}
             <p class="font-medium">Lich da duoc duyet!</p>
             {% elif next_schedule.status.value == 'submitted' %}
             <p class="font-medium">Da gui dang ky, dang cho duyet.</p>
-            <p class="text-sm">Gui luc: {{ next_schedule.submitted_at.strftime('%d/%m/%Y %H:%M') }}</p>
+            <p class="text-sm">Gui luc: {{ next_schedule.submitted_at.strftime('%d/%m/%Y %H:%M') if next_schedule.submitted_at else '-' }}</p>
+            <p class="text-sm mt-1">Ban co the sua lai truoc khi Admin duyet.</p>
             {% else %}
-            <p class="font-medium">Chua gui dang ky.</p>
+            <p class="font-medium">Lich bi tra lai de sua!</p>
+            <p class="text-sm">Vui long sua va gui lai.</p>
             {% endif %}
         </div>
+
+        <!-- Hien thi cac ca da dang ky -->
+        {% if next_shifts %}
+        <h4 class="font-medium mb-2 text-gray-700">Cac ca da dang ky:</h4>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-2 text-left">Ngay</th>
+                        <th class="px-4 py-2 text-left">Ca</th>
+                        <th class="px-4 py-2 text-left">Thoi gian</th>
+                        <th class="px-4 py-2 text-left">Trang thai</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    {% for shift in next_shifts %}
+                    <tr>
+                        <td class="px-4 py-2">
+                            {{ ['Thu 2', 'Thu 3', 'Thu 4', 'Thu 5', 'Thu 6', 'Thu 7', 'CN'][shift.date.weekday()] }}
+                            ({{ shift.date.strftime('%d/%m') }})
+                        </td>
+                        <td class="px-4 py-2">
+                            <span class="px-2 py-1 rounded text-sm
+                                {% if shift.shift_type.value == 'morning' %}bg-yellow-100 text-yellow-700
+                                {% elif shift.shift_type.value == 'afternoon' %}bg-orange-100 text-orange-700
+                                {% else %}bg-indigo-100 text-indigo-700{% endif %}">
+                                {% if shift.shift_type.value == 'morning' %}Ca Sang
+                                {% elif shift.shift_type.value == 'afternoon' %}Ca Chieu
+                                {% else %}Ca Toi{% endif %}
+                            </span>
+                        </td>
+                        <td class="px-4 py-2">
+                            {{ shift.shift_start_time.strftime('%H:%M') }} - {{ shift.shift_end_time.strftime('%H:%M') }}
+                        </td>
+                        <td class="px-4 py-2">
+                            {% if shift.is_confirmed %}
+                            <span class="text-green-600 font-medium">Da duyet</span>
+                            {% else %}
+                            <span class="text-blue-600">Cho duyet</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
         {% else %}
         <div class="p-4 bg-yellow-100 text-yellow-700 rounded-lg">
             <p class="font-medium">Ban chua dang ky lich tuan sau!</p>

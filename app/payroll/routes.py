@@ -48,13 +48,17 @@ def list():
                            year=year)
 
 
-@bp.route('/calculate', methods=['POST'])
+@bp.route('/calculate', methods=['GET', 'POST'])
 @login_required
 @admin_required
 def calculate():
-    """Tinh luong cho tat ca NV"""
-    month = request.form.get('month', type=int, default=datetime.now().month)
-    year = request.form.get('year', type=int, default=datetime.now().year)
+    """Tinh luong cho tat ca NV (GET hoac POST)"""
+    if request.method == 'POST':
+        month = request.form.get('month', type=int, default=datetime.now().month)
+        year = request.form.get('year', type=int, default=datetime.now().year)
+    else:
+        month = request.args.get('month', type=int, default=datetime.now().month)
+        year = request.args.get('year', type=int, default=datetime.now().year)
 
     try:
         payrolls = calculate_all_payrolls(month, year)

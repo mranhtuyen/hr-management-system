@@ -20,6 +20,23 @@
         </div>
     </div>
 
+    {% if current_user.role.value == 'admin' %}
+    <!-- Admin Actions -->
+    <div class="flex gap-2">
+        <button onclick="openAddModal()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+            + Them ca lam viec
+        </button>
+        <form action="{{ url_for('schedule.reset_schedule') }}" method="POST" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="week_offset" value="{{ week_offset }}">
+            <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+                onclick="return confirm('Reset lich tuan nay? Chi xoa cac ca da xep, giu nguyen dang ky cua NV.')">
+                Reset lich tuan nay
+            </button>
+        </form>
+    </div>
+    {% endif %}
+
     <!-- Schedule Grid -->
     <div class="bg-white rounded-lg shadow overflow-hidden">
         <div class="overflow-x-auto">
@@ -50,8 +67,19 @@
                             {% if staff_list %}
                             <div class="space-y-1">
                                 {% for item in staff_list %}
-                                <div class="text-sm px-2 py-1 bg-blue-100 rounded">
-                                    {{ item.user.full_name }}
+                                <div class="text-sm px-2 py-1 bg-blue-100 rounded flex justify-between items-center group">
+                                    <span>{{ item.user.full_name }}</span>
+                                    {% if current_user.role.value == 'admin' %}
+                                    <div class="hidden group-hover:flex gap-1">
+                                        <a href="{{ url_for('schedule.edit_shift', shift_id=item.shift.id) }}"
+                                           class="text-blue-600 hover:text-blue-800 text-xs" title="Sua">&#9998;</a>
+                                        <form action="{{ url_for('schedule.delete_shift', shift_id=item.shift.id) }}" method="POST" class="inline">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="text-red-600 hover:text-red-800 text-xs" title="Xoa"
+                                                onclick="return confirm('Xoa ca lam viec nay?')">&#10005;</button>
+                                        </form>
+                                    </div>
+                                    {% endif %}
                                 </div>
                                 {% endfor %}
                             </div>
@@ -72,7 +100,75 @@
         <p class="text-sm text-gray-600">
             <strong>Ghi chu:</strong>
             Moi ca can toi thieu 2 nhan vien. Ca dong co the co 3 nguoi.
+            {% if current_user.role.value == 'admin' %}
+            <br>Di chuot vao ten NV de hien thi nut Sua/Xoa.
+            {% endif %}
         </p>
     </div>
 </div>
+
+{% if current_user.role.value == 'admin' %}
+<!-- Add Shift Modal -->
+<div id="addModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl p-6 w-96">
+        <h3 class="text-lg font-semibold mb-4">Them ca lam viec</h3>
+        <form action="{{ url_for('schedule.add_shift') }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Nhan vien</label>
+                <select name="user_id" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <option value="">-- Chon nhan vien --</option>
+                    {% for user in staff_list %}
+                    <option value="{{ user.id }}">{{ user.full_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Ngay</label>
+                <select name="date" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    {% for i in range(7) %}
+                    {% set date = week_start + timedelta(days=i) %}
+                    <option value="{{ date.strftime('%Y-%m-%d') }}">
+                        {{ ['Thu 2', 'Thu 3', 'Thu 4', 'Thu 5', 'Thu 6', 'Thu 7', 'CN'][i] }} ({{ date.strftime('%d/%m') }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Ca</label>
+                <select name="shift_type" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <option value="morning">Ca Sang (7h-12h)</option>
+                    <option value="afternoon">Ca Chieu (12h-18h)</option>
+                    <option value="evening">Ca Toi (18h-22h)</option>
+                </select>
+            </div>
+
+            <div class="flex justify-end gap-2">
+                <button type="button" onclick="closeAddModal()" class="px-4 py-2 border rounded-lg hover:bg-gray-100">
+                    Huy
+                </button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Them
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openAddModal() {
+    document.getElementById('addModal').classList.remove('hidden');
+}
+function closeAddModal() {
+    document.getElementById('addModal').classList.add('hidden');
+}
+// Close modal when clicking outside
+document.getElementById('addModal').addEventListener('click', function(e) {
+    if (e.target === this) closeAddModal();
+});
+</script>
+{% endif %}
 {% endblock %}

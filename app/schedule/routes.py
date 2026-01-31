@@ -55,16 +55,34 @@ def register():
         week_start_date=week_start
     ).first()
 
-    if existing_schedule and existing_schedule.status != ScheduleStatus.DRAFT:
-        flash('Ban da dang ky lich cho tuan nay roi.', 'warning')
+    # Chi chan khi da APPROVED
+    if existing_schedule and existing_schedule.status == ScheduleStatus.APPROVED:
+        flash('Lich cua ban da duoc duyet. Lien he Admin neu can thay doi.', 'warning')
         return redirect(url_for('schedule.my_schedule'))
 
-    # Kiem tra thoi gian dang ky
-    if not is_registration_open():
+    # Kiem tra thoi gian dang ky (bo qua neu dang sua lich bi tra lai)
+    if not is_registration_open() and not (existing_schedule and existing_schedule.status == ScheduleStatus.DRAFT):
         flash('Thoi gian dang ky lich da dong (18h Thu 7). Vui long cho tuan sau.', 'warning')
         return redirect(url_for('dashboard.index'))
 
     form = WeeklyScheduleForm()
+
+    # Pre-fill form voi shifts hien tai neu dang sua
+    if existing_schedule and request.method == 'GET':
+        day_names = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+        for shift in existing_schedule.shifts:
+            day_offset = (shift.date - week_start).days
+            if 0 <= day_offset < 7:
+                day_name = day_names[day_offset]
+                day_form = getattr(form, day_name)
+                if shift.shift_type == ShiftType.MORNING:
+                    day_form.morning.data = True
+                elif shift.shift_type == ShiftType.AFTERNOON:
+                    day_form.afternoon.data = True
+                elif shift.shift_type == ShiftType.EVENING:
+                    day_form.evening.data = True
+                if shift.is_and_condition:
+                    day_form.is_and_condition.data = True
 
     if form.validate_on_submit():
         # Tao hoac cap nhat WorkSchedule
@@ -121,7 +139,8 @@ def register():
                            form=form,
                            week_start=week_start,
                            week_end=week_end,
-                           is_open=is_registration_open(),
+                           is_open=is_registration_open() or (existing_schedule and existing_schedule.status == ScheduleStatus.DRAFT),
+                           existing_schedule=existing_schedule,
                            timedelta=timedelta)
 
 
@@ -140,22 +159,33 @@ def my_schedule():
 
     current_shifts = []
     if current_schedule:
+        # Hien thi tat ca shifts da duoc confirmed
         current_shifts = ScheduleShift.query.filter_by(
             schedule_id=current_schedule.id,
             is_confirmed=True
         ).order_by(ScheduleShift.date).all()
 
     # Lich tuan sau
-    next_week_start, _ = get_next_week_dates()
+    next_week_start, next_week_end = get_next_week_dates()
     next_schedule = WorkSchedule.query.filter_by(
         user_id=current_user.id,
         week_start_date=next_week_start
     ).first()
 
+    # Lay shifts tuan sau (ca da dang ky va da duyet)
+    next_shifts = []
+    if next_schedule:
+        next_shifts = ScheduleShift.query.filter_by(
+            schedule_id=next_schedule.id
+        ).order_by(ScheduleShift.date).all()
+
     return render_template('schedule/my_schedule.html',
                            current_schedule=current_schedule,
                            current_shifts=current_shifts,
                            next_schedule=next_schedule,
+                           next_shifts=next_shifts,
+                           next_week_start=next_week_start,
+                           next_week_end=next_week_end,
                            today=today)
 
 
@@ -183,27 +213,33 @@ def view():
         ScheduleShift.is_confirmed == True
     ).order_by(ScheduleShift.date, ScheduleShift.shift_type).all()
 
-    # Nhom theo ngay va ca
+    # Nhom theo ngay va ca (dung string keys cho template)
     schedule_grid = {}
     for day_offset in range(7):
         date = week_start + timedelta(days=day_offset)
         schedule_grid[date] = {
-            ShiftType.MORNING: [],
-            ShiftType.AFTERNOON: [],
-            ShiftType.EVENING: []
+            'morning': [],
+            'afternoon': [],
+            'evening': []
         }
 
     for shift, user in shifts:
-        schedule_grid[shift.date][shift.shift_type].append({
+        shift_type_str = shift.shift_type.value  # Convert enum to string
+        schedule_grid[shift.date][shift_type_str].append({
             'user': user,
             'shift': shift
         })
+
+    # Lay danh sach NV de them ca
+    staff_list = User.query.filter_by(status='active').order_by(User.full_name).all()
 
     return render_template('schedule/view.html',
                            schedule_grid=schedule_grid,
                            week_start=week_start,
                            week_end=week_end,
-                           week_offset=week_offset)
+                           week_offset=week_offset,
+                           staff_list=staff_list,
+                           timedelta=timedelta)
 
 
 @bp.route('/review')
@@ -235,7 +271,8 @@ def review():
                            approved_schedules=approved_schedules,
                            not_registered=not_registered,
                            week_start=week_start,
-                           week_end=week_end)
+                           week_end=week_end,
+                           timedelta=timedelta)
 
 
 @bp.route('/approve/<int:schedule_id>', methods=['POST'])
@@ -257,6 +294,88 @@ def approve(schedule_id):
     return redirect(url_for('schedule.review'))
 
 
+@bp.route('/return/<int:schedule_id>', methods=['POST'])
+@login_required
+@manager_required
+def return_schedule(schedule_id):
+    """Tra lich lai cho NV de sua"""
+    schedule = WorkSchedule.query.get_or_404(schedule_id)
+    schedule.status = ScheduleStatus.DRAFT
+    schedule.approved_at = None
+    schedule.approved_by = None
+
+    # Unconfirm tat ca shifts
+    for shift in schedule.shifts:
+        shift.is_confirmed = False
+
+    db.session.commit()
+    flash(f'Da tra lich lai cho {schedule.user.full_name} de sua', 'info')
+    return redirect(url_for('schedule.review'))
+
+
+@bp.route('/unapprove/<int:schedule_id>', methods=['POST'])
+@login_required
+@manager_required
+def unapprove(schedule_id):
+    """Huy duyet lich - cho phep NV sua lai"""
+    schedule = WorkSchedule.query.get_or_404(schedule_id)
+    schedule.status = ScheduleStatus.DRAFT
+    schedule.approved_at = None
+    schedule.approved_by = None
+
+    # Unconfirm tat ca shifts
+    for shift in schedule.shifts:
+        shift.is_confirmed = False
+
+    db.session.commit()
+    flash(f'Da huy duyet lich cua {schedule.user.full_name}', 'info')
+    return redirect(url_for('schedule.review'))
+
+
+@bp.route('/edit-schedule/<int:schedule_id>', methods=['GET', 'POST'])
+@login_required
+@manager_required
+def edit_schedule(schedule_id):
+    """Admin sua lich cua NV truoc khi duyet"""
+    schedule = WorkSchedule.query.get_or_404(schedule_id)
+    week_start = schedule.week_start_date
+    week_end = schedule.week_end_date
+
+    if request.method == 'POST':
+        # Xoa shifts cu
+        ScheduleShift.query.filter_by(schedule_id=schedule.id).delete()
+
+        # Luu shifts moi
+        day_names = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+        for day_offset, day_name in enumerate(day_names):
+            shift_date = week_start + timedelta(days=day_offset)
+            for shift_type_str in ['morning', 'afternoon', 'evening']:
+                field_name = f'{day_name}_{shift_type_str}'
+                if request.form.get(field_name):
+                    shift_type = ShiftType(shift_type_str)
+                    shift_start, shift_end = SHIFT_TIMES[shift_type]
+                    shift = ScheduleShift(
+                        schedule_id=schedule.id,
+                        date=shift_date,
+                        shift_type=shift_type,
+                        shift_start_time=shift_start,
+                        shift_end_time=shift_end,
+                        is_preferred=True,
+                        is_confirmed=False
+                    )
+                    db.session.add(shift)
+
+        db.session.commit()
+        flash(f'Da cap nhat lich cho {schedule.user.full_name}', 'success')
+        return redirect(url_for('schedule.review'))
+
+    return render_template('schedule/edit_schedule.html',
+                           schedule=schedule,
+                           week_start=week_start,
+                           week_end=week_end,
+                           timedelta=timedelta)
+
+
 @bp.route('/auto-generate', methods=['GET', 'POST'])
 @login_required
 @admin_required
@@ -264,10 +383,17 @@ def auto_generate():
     """Chay thuat toan xep lich tu dong (Admin only - GET/POST)"""
     week_start, week_end = get_next_week_dates()
 
+    # Lay so nhan vien moi ca tu form
+    staff_per_shift = request.form.get('staff_per_shift', type=int, default=2)
+    if staff_per_shift < 1:
+        staff_per_shift = 2
+    if staff_per_shift > 4:
+        staff_per_shift = 4
+
     try:
-        result = auto_generate_schedule(week_start)
+        result = auto_generate_schedule(week_start, staff_per_shift=staff_per_shift)
         if result and result.get('success'):
-            flash(f'Da xep lich tu dong thanh cong! Tuan {week_start.strftime("%d/%m")} - {week_end.strftime("%d/%m/%Y")}. Tong cong {result.get("total_shifts_assigned", 0)} ca.', 'success')
+            flash(f'Da xep lich tu dong thanh cong! Tuan {week_start.strftime("%d/%m")} - {week_end.strftime("%d/%m/%Y")}. Tong cong {result.get("total_shifts_assigned", 0)} ca ({staff_per_shift} NV/ca).', 'success')
         else:
             flash('Xep lich tu dong hoan thanh nhung co the chua toi uu.', 'warning')
     except Exception as e:
@@ -275,6 +401,107 @@ def auto_generate():
         flash(f'Loi khi xep lich tu dong: {str(e)}', 'danger')
 
     return redirect(url_for('schedule.review'))
+
+
+@bp.route('/reset-schedule', methods=['POST'])
+@login_required
+@admin_required
+def reset_schedule():
+    """Reset lich da xep de xep lai bang tay"""
+    # Lay week_offset tu form
+    week_offset = request.form.get('week_offset', type=int, default=0)
+    today = datetime.now().date()
+    current_week_start = today - timedelta(days=today.weekday())
+    week_start = current_week_start + timedelta(weeks=week_offset)
+    week_end = week_start + timedelta(days=6)
+
+    try:
+        # Chi dat is_confirmed = False cho cac shifts, khong xoa
+        # Giu nguyen dang ky cua NV
+        shifts_reset = 0
+        schedules = WorkSchedule.query.filter_by(week_start_date=week_start).all()
+        for schedule in schedules:
+            for shift in schedule.shifts:
+                if shift.is_confirmed:
+                    shift.is_confirmed = False
+                    shifts_reset += 1
+
+        db.session.commit()
+        flash(f'Da reset {shifts_reset} ca lam viec tuan {week_start.strftime("%d/%m")} - {week_end.strftime("%d/%m/%Y")}. Cac dang ky giu nguyen, co the xep lai bang tay.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Loi khi reset lich: {str(e)}', 'danger')
+
+    return redirect(url_for('schedule.view', week=week_offset))
+
+
+@bp.route('/add-shift', methods=['POST'])
+@login_required
+@admin_required
+def add_shift():
+    """Them ca lam viec moi"""
+    user_id = request.form.get('user_id', type=int)
+    date_str = request.form.get('date')
+    shift_type_str = request.form.get('shift_type')
+
+    if not all([user_id, date_str, shift_type_str]):
+        flash('Thieu thong tin ca lam viec.', 'danger')
+        return redirect(url_for('schedule.view', week=1))
+
+    try:
+        shift_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        shift_type = ShiftType(shift_type_str)
+        shift_start, shift_end = SHIFT_TIMES[shift_type]
+
+        # Tim hoac tao WorkSchedule
+        week_start = shift_date - timedelta(days=shift_date.weekday())
+        week_end = week_start + timedelta(days=6)
+
+        schedule = WorkSchedule.query.filter_by(
+            user_id=user_id,
+            week_start_date=week_start
+        ).first()
+
+        if not schedule:
+            schedule = WorkSchedule(
+                user_id=user_id,
+                week_start_date=week_start,
+                week_end_date=week_end,
+                status=ScheduleStatus.APPROVED,
+                approved_at=datetime.now(),
+                approved_by=current_user.id
+            )
+            db.session.add(schedule)
+            db.session.flush()
+
+        # Kiem tra shift da ton tai chua
+        existing = ScheduleShift.query.filter_by(
+            schedule_id=schedule.id,
+            date=shift_date,
+            shift_type=shift_type
+        ).first()
+
+        if existing:
+            flash('Ca lam viec nay da ton tai.', 'warning')
+        else:
+            shift = ScheduleShift(
+                schedule_id=schedule.id,
+                date=shift_date,
+                shift_type=shift_type,
+                shift_start_time=shift_start,
+                shift_end_time=shift_end,
+                is_preferred=False,
+                is_confirmed=True
+            )
+            db.session.add(shift)
+            db.session.commit()
+            flash('Da them ca lam viec thanh cong.', 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Loi khi them ca: {str(e)}', 'danger')
+
+    return redirect(url_for('schedule.view', week=1))
 
 
 @bp.route('/edit/<int:shift_id>', methods=['GET', 'POST'])

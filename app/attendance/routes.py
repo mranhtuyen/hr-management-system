@@ -198,12 +198,16 @@ def report():
                            year=year)
 
 
-@bp.route('/process-late', methods=['POST'])
+@bp.route('/process-late', methods=['GET', 'POST'])
 @login_required
 @manager_required
 def process_late():
-    """Xu ly di muon thu cong"""
-    date_str = request.form.get('date')
+    """Xu ly di muon thu cong (GET hoac POST)"""
+    if request.method == 'POST':
+        date_str = request.form.get('date')
+    else:
+        date_str = request.args.get('date')
+
     if date_str:
         try:
             process_date = datetime.strptime(date_str, '%Y-%m-%d').date()

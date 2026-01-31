@@ -12,7 +12,22 @@
             </span>
         </div>
 
-        {% if not is_open %}
+        {% if existing_schedule %}
+        <div class="mb-6 p-4 rounded-lg
+            {% if existing_schedule.status.value == 'approved' %}bg-green-100 text-green-700
+            {% elif existing_schedule.status.value == 'submitted' %}bg-blue-100 text-blue-700
+            {% else %}bg-yellow-100 text-yellow-700{% endif %}">
+            <p class="font-medium">
+                {% if existing_schedule.status.value == 'approved' %}
+                Lich da duoc duyet! Lien he Admin neu can thay doi.
+                {% elif existing_schedule.status.value == 'submitted' %}
+                Da gui dang ky, dang cho duyet. Ban co the sua lai truoc khi duyet.
+                {% else %}
+                Lich bi tra lai de sua. Vui long sua va gui lai.
+                {% endif %}
+            </p>
+        </div>
+        {% elif not is_open %}
         <div class="bg-yellow-100 text-yellow-700 p-4 rounded-lg mb-6">
             <p class="font-medium">Thoi gian dang ky da dong!</p>
             <p class="text-sm">Mo lai vao Thu 6 tuan sau.</p>

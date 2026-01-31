@@ -1,14 +1,18 @@
 """
 Module xu ly import file Excel cham cong tu may van tay
 
-Format Excel mong doi:
-| Ma NV | Ho ten | Ngay | Gio vao | Gio ra |
-|-------|--------|------|---------|--------|
-| 001   | Nguyen A | 2026-01-20 | 06:45 | 12:15 |
+Ho tro 2 format:
+1. Format dong (row format):
+   | Ma NV | Ho ten | Ngay | Gio vao | Gio ra |
+
+2. Format cot (pivot table format - tu may cham cong):
+   | Ma NV | Ten | 01-12 | 02-12 | 03-12 | ...
+   Moi cell chua gio vao/ra cach boi xuong dong
 """
 
+import os
 from openpyxl import load_workbook
-from datetime import datetime, time, timedelta
+from datetime import datetime, time, timedelta, date as date_type
 from app.models import (
     AttendanceRecord, User, WorkSchedule, ScheduleShift,
     ShiftType, db
@@ -149,6 +153,283 @@ def find_scheduled_shift(user_id, date, actual_checkin):
     return shifts[0]
 
 
+def load_excel_file(file_path):
+    """
+    Load file Excel (.xlsx hoac .xls)
+    Returns: (workbook_data, is_openpyxl, error_message)
+    """
+    ext = os.path.splitext(file_path)[1].lower()
+
+    if ext == '.xlsx':
+        try:
+            wb = load_workbook(file_path)
+            return wb.active, True, None
+        except Exception as e:
+            return None, None, f'Khong the doc file xlsx: {str(e)}'
+
+    elif ext == '.xls':
+        try:
+            import xlrd
+            wb = xlrd.open_workbook(file_path)
+            ws = wb.sheet_by_index(0)
+            return ws, False, None
+        except ImportError:
+            return None, None, 'Can cai dat xlrd de doc file .xls'
+        except Exception as e:
+            return None, None, f'Khong the doc file xls: {str(e)}'
+
+    else:
+        return None, None, f'Dinh dang file khong ho tro: {ext}'
+
+
+def get_cell_value(ws, row, col, is_openpyxl):
+    """Lay gia tri cell tu worksheet"""
+    if is_openpyxl:
+        return ws.cell(row=row+1, column=col+1).value  # openpyxl 1-indexed
+    else:
+        try:
+            return ws.cell_value(row, col)  # xlrd 0-indexed
+        except:
+            return None
+
+
+def get_sheet_dimensions(ws, is_openpyxl):
+    """Lay kich thuoc sheet (rows, cols)"""
+    if is_openpyxl:
+        return ws.max_row, ws.max_column
+    else:
+        return ws.nrows, ws.ncols
+
+
+def detect_format(ws, is_openpyxl):
+    """
+    Phat hien format file Excel
+    Returns: 'row' hoac 'pivot'
+    """
+    # Lay header row
+    max_cols = get_sheet_dimensions(ws, is_openpyxl)[1]
+
+    # Kiem tra cot thu 3 (index 2)
+    if max_cols >= 3:
+        header_val = get_cell_value(ws, 0, 2, is_openpyxl)
+        if header_val:
+            header_str = str(header_val).strip().lower()
+            # Neu header la 'ngay' -> row format
+            if header_str in ['ngay', 'ngày', 'date']:
+                return 'row'
+            # Neu header la ngay thang (12-01, 01/12, etc) -> pivot format
+            if '-' in str(header_val) or '/' in str(header_val):
+                return 'pivot'
+
+    return 'row'  # Default
+
+
+def parse_pivot_date(header_val, year=None):
+    """
+    Parse date tu header cot pivot format
+    VD: '01-12', '12-01', '01/12', '12/01'
+    """
+    if year is None:
+        year = datetime.now().year
+
+    if header_val is None:
+        return None
+
+    header_str = str(header_val).strip()
+
+    # Thu cac format khac nhau
+    for sep in ['-', '/']:
+        if sep in header_str:
+            parts = header_str.split(sep)
+            if len(parts) == 2:
+                try:
+                    # Thu DD-MM truoc
+                    day = int(parts[0])
+                    month = int(parts[1])
+                    if 1 <= day <= 31 and 1 <= month <= 12:
+                        return date_type(year, month, day)
+                except ValueError:
+                    pass
+                try:
+                    # Thu MM-DD
+                    month = int(parts[0])
+                    day = int(parts[1])
+                    if 1 <= day <= 31 and 1 <= month <= 12:
+                        return date_type(year, month, day)
+                except ValueError:
+                    pass
+
+    return None
+
+
+def parse_checkin_checkout(cell_value):
+    """
+    Parse gio check-in va check-out tu cell
+    Cell co the chua:
+    - 1 thoi gian: '7:00'
+    - 2 thoi gian cach newline: '7:00\n12:00'
+    - 2 thoi gian cach space: '7:00 12:00'
+
+    Returns: (checkin_time, checkout_time)
+    """
+    if cell_value is None:
+        return None, None
+
+    cell_str = str(cell_value).strip()
+    if not cell_str:
+        return None, None
+
+    # Tach cac phan tu
+    times = []
+    for sep in ['\n', '\r\n', '  ', ' - ', '/']:
+        if sep in cell_str:
+            parts = cell_str.split(sep)
+            for p in parts:
+                p = p.strip()
+                if p:
+                    t = parse_time(p)
+                    if t:
+                        times.append(t)
+            break
+
+    if not times:
+        # Chi co 1 gia tri
+        t = parse_time(cell_str)
+        if t:
+            times = [t]
+
+    if len(times) == 0:
+        return None, None
+    elif len(times) == 1:
+        return times[0], None
+    else:
+        return times[0], times[1]
+
+
+def import_pivot_format(ws, is_openpyxl):
+    """Import file Excel format pivot (ngay o cot)"""
+    records_created = 0
+    errors = []
+    records = []
+
+    max_rows, max_cols = get_sheet_dimensions(ws, is_openpyxl)
+    current_year = datetime.now().year
+
+    # Parse headers (dates)
+    date_columns = {}  # {col_index: date}
+    for col in range(2, max_cols):
+        header = get_cell_value(ws, 0, col, is_openpyxl)
+        if header:
+            parsed_date = parse_pivot_date(header, current_year)
+            if parsed_date:
+                date_columns[col] = parsed_date
+
+    if not date_columns:
+        return {'success': 0, 'errors': ['Khong tim thay cot ngay thang trong file'], 'records': []}
+
+    # Process each employee row
+    for row in range(1, max_rows):
+        employee_code = get_cell_value(ws, row, 0, is_openpyxl)
+        if not employee_code:
+            continue
+
+        employee_code = str(employee_code).strip()
+
+        # Tim user
+        user = User.query.filter_by(username=employee_code).first()
+        if not user:
+            user = User.query.filter(User.full_name.ilike(f'%{employee_code}%')).first()
+
+        if not user:
+            # Bo qua NV khong tim thay (khong bao loi)
+            continue
+
+        # Process each date column
+        for col, date in date_columns.items():
+            cell_value = get_cell_value(ws, row, col, is_openpyxl)
+            if not cell_value:
+                continue
+
+            checkin_time, checkout_time = parse_checkin_checkout(cell_value)
+            if not checkin_time:
+                continue
+
+            try:
+                # Tim ca lam viec da duoc phan
+                scheduled_shift = find_scheduled_shift(user.id, date, checkin_time)
+
+                # Neu khong co lich, tao record voi shift type suy doan
+                if not scheduled_shift:
+                    # Suy doan shift type tu thoi gian check-in
+                    if checkin_time.hour < 12:
+                        shift_type = ShiftType.MORNING
+                        scheduled_start = time(7, 0)
+                        scheduled_end = time(12, 0)
+                    elif checkin_time.hour < 18:
+                        shift_type = ShiftType.AFTERNOON
+                        scheduled_start = time(12, 0)
+                        scheduled_end = time(18, 0)
+                    else:
+                        shift_type = ShiftType.EVENING
+                        scheduled_start = time(18, 0)
+                        scheduled_end = time(22, 0)
+                else:
+                    shift_type = scheduled_shift.shift_type
+                    scheduled_start = scheduled_shift.shift_start_time
+                    scheduled_end = scheduled_shift.shift_end_time
+
+                # Kiem tra da import chua
+                existing = AttendanceRecord.query.filter_by(
+                    user_id=user.id,
+                    date=date,
+                    shift_type=shift_type
+                ).first()
+
+                if existing:
+                    continue  # Skip quietly for pivot format
+
+                # Tinh toan
+                late_minutes = calculate_late_minutes(scheduled_start, checkin_time)
+                work_hours = calculate_work_hours(
+                    scheduled_start, scheduled_end, checkin_time, late_minutes
+                )
+
+                # Check early bird
+                early_bird_threshold = time(6, 55)
+                is_early_bird = checkin_time and checkin_time < early_bird_threshold
+
+                # Tao record
+                record = AttendanceRecord(
+                    user_id=user.id,
+                    date=date,
+                    shift_type=shift_type,
+                    scheduled_start=scheduled_start,
+                    scheduled_end=scheduled_end,
+                    actual_checkin=checkin_time,
+                    actual_checkout=checkout_time,
+                    late_minutes=late_minutes,
+                    total_work_hours=round(work_hours, 2),
+                    is_late=(late_minutes > 0),
+                    is_early_bird=is_early_bird
+                )
+
+                db.session.add(record)
+                records.append(record)
+                records_created += 1
+
+            except Exception as e:
+                errors.append(f'NV {employee_code} ngay {date}: Loi - {str(e)}')
+
+    if records_created > 0:
+        db.session.commit()
+
+    return {
+        'success': records_created,
+        'errors': errors,
+        'records': records
+    }
+
+
 def import_attendance_excel(file_path):
     """
     Import file Excel cham cong
@@ -163,11 +444,117 @@ def import_attendance_excel(file_path):
             'records': list records da tao
         }
     """
-    try:
-        wb = load_workbook(file_path)
-        ws = wb.active
-    except Exception as e:
-        return {'success': 0, 'errors': [f'Khong the doc file: {str(e)}'], 'records': []}
+    ws, is_openpyxl, error = load_excel_file(file_path)
+    if error:
+        return {'success': 0, 'errors': [error], 'records': []}
+
+    # Detect format
+    file_format = detect_format(ws, is_openpyxl)
+
+    if file_format == 'pivot':
+        return import_pivot_format(ws, is_openpyxl)
+
+    # Row format (original)
+    if is_openpyxl:
+        return import_row_format_openpyxl(ws)
+    else:
+        return import_row_format_xlrd(ws)
+
+
+def import_row_format_xlrd(ws):
+    """Import file xls row format using xlrd"""
+    records_created = 0
+    errors = []
+    records = []
+
+    for row_num in range(1, ws.nrows):
+        try:
+            row = [ws.cell_value(row_num, col) for col in range(ws.ncols)]
+
+            if not row or not row[0]:
+                continue
+
+            employee_code = str(row[0]).strip()
+            date = parse_date(row[2]) if len(row) > 2 else None
+            checkin_time = parse_time(row[3]) if len(row) > 3 else None
+            checkout_time = parse_time(row[4]) if len(row) > 4 else None
+
+            if not date:
+                errors.append(f'Dong {row_num+1}: Ngay khong hop le')
+                continue
+
+            user = User.query.filter_by(username=employee_code).first()
+            if not user:
+                user = User.query.filter(User.full_name.ilike(f'%{employee_code}%')).first()
+
+            if not user:
+                # Bo qua NV khong tim thay
+                continue
+
+            scheduled_shift = find_scheduled_shift(user.id, date, checkin_time)
+
+            if not scheduled_shift:
+                # Bo qua neu khong co lich
+                continue
+
+            existing = AttendanceRecord.query.filter_by(
+                user_id=user.id,
+                date=date,
+                shift_type=scheduled_shift.shift_type
+            ).first()
+
+            if existing:
+                # Bo qua neu da import
+                continue
+
+            late_minutes = calculate_late_minutes(
+                scheduled_shift.shift_start_time,
+                checkin_time
+            )
+
+            work_hours = calculate_work_hours(
+                scheduled_shift.shift_start_time,
+                scheduled_shift.shift_end_time,
+                checkin_time,
+                late_minutes
+            )
+
+            early_bird_threshold = time(6, 55)
+            is_early_bird = checkin_time and checkin_time < early_bird_threshold
+
+            record = AttendanceRecord(
+                user_id=user.id,
+                date=date,
+                shift_type=scheduled_shift.shift_type,
+                scheduled_start=scheduled_shift.shift_start_time,
+                scheduled_end=scheduled_shift.shift_end_time,
+                actual_checkin=checkin_time,
+                actual_checkout=checkout_time,
+                late_minutes=late_minutes,
+                total_work_hours=round(work_hours, 2),
+                is_late=(late_minutes > 0),
+                is_early_bird=is_early_bird
+            )
+
+            db.session.add(record)
+            records.append(record)
+            records_created += 1
+
+        except Exception as e:
+            errors.append(f'Dong {row_num+1}: Loi - {str(e)}')
+
+    if records_created > 0:
+        db.session.commit()
+
+    return {
+        'success': records_created,
+        'errors': errors,
+        'records': records
+    }
+
+
+def import_row_format_openpyxl(ws):
+    """Import file xlsx row format using openpyxl (original logic)"""
 
     records_created = 0
     errors = []
@@ -197,14 +584,14 @@ def import_attendance_excel(file_path):
                 user = User.query.filter(User.full_name.ilike(f'%{employee_code}%')).first()
 
             if not user:
-                errors.append(f'Dong {row_num}: Khong tim thay NV "{employee_code}"')
+                # Bo qua NV khong tim thay
                 continue
 
             # Tim ca lam viec da duoc phan
             scheduled_shift = find_scheduled_shift(user.id, date, checkin_time)
 
             if not scheduled_shift:
-                errors.append(f'Dong {row_num}: Khong co lich cho NV {employee_code} ngay {date}')
+                # Bo qua neu khong co lich
                 continue
 
             # Kiem tra da import chua
@@ -215,7 +602,7 @@ def import_attendance_excel(file_path):
             ).first()
 
             if existing:
-                errors.append(f'Dong {row_num}: Da import cho NV {employee_code} ngay {date}')
+                # Bo qua neu da import
                 continue
 
             # Tinh toan

@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Sua lich dang ky - HR System{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800">Sua lich dang ky</h1>
+        <a href="{{ url_for('schedule.review') }}" class="text-blue-600 hover:underline">&larr; Quay lai</a>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="mb-4 p-4 bg-blue-50 rounded-lg">
+            <p><strong>Nhan vien:</strong> {{ schedule.user.full_name }}</p>
+            <p><strong>Tuan:</strong> {{ week_start.strftime('%d/%m') }} - {{ week_end.strftime('%d/%m/%Y') }}</p>
+            <p><strong>Trang thai:</strong>
+                {% if schedule.status.value == 'approved' %}
+                <span class="text-green-600">Da duyet</span>
+                {% elif schedule.status.value == 'submitted' %}
+                <span class="text-blue-600">Cho duyet</span>
+                {% else %}
+                <span class="text-gray-600">Nhap</span>
+                {% endif %}
+            </p>
+        </div>
+
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-2 text-left">Ca</th>
+                            {% for i in range(7) %}
+                            {% set day = week_start + timedelta(days=i) %}
+                            <th class="px-4 py-2 text-center">
+                                {{ ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'][i] }}<br>
+                                <span class="text-xs text-gray-500">{{ day.strftime('%d/%m') }}</span>
+                            </th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% set day_names = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] %}
+                        {% for shift_type, shift_name, color in [('morning', 'Sang', 'yellow'), ('afternoon', 'Chieu', 'orange'), ('evening', 'Toi', 'indigo')] %}
+                        <tr class="border-t">
+                            <td class="px-4 py-3 font-medium bg-gray-50">{{ shift_name }}</td>
+                            {% for i in range(7) %}
+                            {% set day = week_start + timedelta(days=i) %}
+                            {% set field_name = day_names[i] ~ '_' ~ shift_type %}
+                            {% set has_shift = schedule.shifts | selectattr('date', 'equalto', day) | selectattr('shift_type.value', 'equalto', shift_type) | list | length > 0 %}
+                            <td class="px-4 py-3 text-center border-l">
+                                <input type="checkbox" name="{{ field_name }}" value="1"
+                                    class="w-5 h-5 text-{{ color }}-600 rounded focus:ring-{{ color }}-500"
+                                    {% if has_shift %}checked{% endif %}>
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-6 flex justify-end gap-4">
+                <a href="{{ url_for('schedule.review') }}" class="px-4 py-2 border rounded-lg hover:bg-gray-100">
+                    Huy
+                </a>
+                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Luu thay doi
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
