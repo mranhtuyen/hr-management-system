@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}Chi tiet luong - HR System{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800">Phieu luong thang {{ payroll.month }}/{{ payroll.year }}</h1>
+        <a href="{{ url_for('payroll.download_payslip', payroll_id=payroll.id) }}"
+            class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+            Tai PDF
+        </a>
+    </div>
+
+    <!-- Employee Info -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold mb-4">Thong tin nhan vien</h3>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+                <p class="text-gray-500 text-sm">Ho ten</p>
+                <p class="font-medium">{{ user.full_name }}</p>
+            </div>
+            <div>
+                <p class="text-gray-500 text-sm">Ma NV</p>
+                <p class="font-medium">{{ user.username }}</p>
+            </div>
+            <div>
+                <p class="text-gray-500 text-sm">Luong/gio</p>
+                <p class="font-medium">{{ "{:,.0f}".format(user.hourly_rate) }}d</p>
+            </div>
+            <div>
+                <p class="text-gray-500 text-sm">Ty le</p>
+                <p class="font-medium">{{ user.salary_percentage }}%</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Salary Details -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold mb-4">Chi tiet luong</h3>
+        <table class="w-full">
+            <tbody class="divide-y">
+                <tr>
+                    <td class="py-2">Tong gio lam viec</td>
+                    <td class="py-2 text-right">{{ payroll.total_work_hours }} gio</td>
+                </tr>
+                <tr>
+                    <td class="py-2">So ca lam</td>
+                    <td class="py-2 text-right">{{ payroll.total_shifts }} ca</td>
+                </tr>
+                <tr>
+                    <td class="py-2">Luong gop</td>
+                    <td class="py-2 text-right">{{ "{:,.0f}".format(payroll.gross_salary) }}d</td>
+                </tr>
+                <tr>
+                    <td class="py-2">Tien an ca</td>
+                    <td class="py-2 text-right text-green-600">+{{ "{:,.0f}".format(payroll.meal_support_amount) }}d</td>
+                </tr>
+                <tr>
+                    <td class="py-2">Tien thuong</td>
+                    <td class="py-2 text-right text-green-600">+{{ "{:,.0f}".format(payroll.total_reward) }}d</td>
+                </tr>
+                <tr>
+                    <td class="py-2">Tien phat ({{ payroll.late_count }} lan di muon)</td>
+                    <td class="py-2 text-right text-red-600">-{{ "{:,.0f}".format(payroll.total_penalty) }}d</td>
+                </tr>
+                <tr>
+                    <td class="py-2">Tien tam ung</td>
+                    <td class="py-2 text-right text-red-600">-{{ "{:,.0f}".format(payroll.advance_payment) }}d</td>
+                </tr>
+                <tr class="font-bold text-lg">
+                    <td class="py-3">THUC LINH</td>
+                    <td class="py-3 text-right text-blue-600">{{ "{:,.0f}".format(payroll.net_salary) }}d</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Violations -->
+    {% if violations %}
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold mb-4 text-red-600">Vi pham</h3>
+        <div class="space-y-2">
+            {% for v in violations %}
+            <div class="flex justify-between items-center p-3 bg-red-50 rounded">
+                <div>
+                    <span class="font-medium">{{ v.date.strftime('%d/%m/%Y') }}</span>
+                    <span class="text-gray-600 ml-2">{{ v.description or v.type.value }}</span>
+                </div>
+                <span class="text-red-600">-{{ "{:,.0f}".format(v.penalty_amount) }}d</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Rewards -->
+    {% if rewards %}
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold mb-4 text-green-600">Thuong</h3>
+        <div class="space-y-2">
+            {% for r in rewards %}
+            <div class="flex justify-between items-center p-3 bg-green-50 rounded">
+                <div>
+                    <span class="font-medium">{{ r.type.value }}</span>
+                    <span class="text-gray-600 ml-2">{{ r.description or '' }}</span>
+                </div>
+                <span class="text-green-600">+{{ "{:,.0f}".format(r.reward_amount) }}d</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Actions (Admin only) -->
+    {% if current_user.role.value == 'admin' %}
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold mb-4">Thao tac</h3>
+        <div class="flex flex-wrap gap-4">
+            {% if payroll.status.value == 'draft' %}
+            <form action="{{ url_for('payroll.approve', payroll_id=payroll.id) }}" method="POST">
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Duyet luong
+                </button>
+            </form>
+            {% endif %}
+
+            {% if payroll.status.value == 'approved' %}
+            <form action="{{ url_for('payroll.mark_paid', payroll_id=payroll.id) }}" method="POST">
+                <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                    Danh dau da tra
+                </button>
+            </form>
+            {% endif %}
+
+            <form action="{{ url_for('payroll.update_advance', payroll_id=payroll.id) }}" method="POST"
+                class="flex items-center space-x-2">
+                <input type="number" name="advance_payment" value="{{ payroll.advance_payment }}"
+                    class="px-3 py-2 border rounded-lg w-32" placeholder="Tam ung">
+                <button type="submit" class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700">
+                    Cap nhat tam ung
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Status -->
+    <div class="bg-white rounded-lg shadow p-4 text-center">
+        <span class="px-4 py-2 rounded text-lg
+            {% if payroll.status.value == 'paid' %}bg-green-100 text-green-700
+            {% elif payroll.status.value == 'approved' %}bg-blue-100 text-blue-700
+            {% else %}bg-gray-100 text-gray-700{% endif %}">
+            {% if payroll.status.value == 'paid' %}DA TRA LUONG
+            {% elif payroll.status.value == 'approved' %}DA DUYET - CHO TRA
+            {% else %}CHO DUYET{% endif %}
+        </span>
+    </div>
+</div>
+{% endblock %}

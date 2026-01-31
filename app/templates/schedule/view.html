@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Lich lam viec - HR System{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800">Lich lam viec</h1>
+        <div class="flex items-center space-x-4">
+            <a href="{{ url_for('schedule.view', week=week_offset-1) }}" class="px-3 py-1 border rounded hover:bg-gray-100">
+                &larr; Tuan truoc
+            </a>
+            <span class="font-medium">
+                {{ week_start.strftime('%d/%m') }} - {{ week_end.strftime('%d/%m/%Y') }}
+            </span>
+            <a href="{{ url_for('schedule.view', week=week_offset+1) }}" class="px-3 py-1 border rounded hover:bg-gray-100">
+                Tuan sau &rarr;
+            </a>
+        </div>
+    </div>
+
+    <!-- Schedule Grid -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left w-24">Ca</th>
+                        {% for i in range(7) %}
+                        {% set date = week_start + timedelta(days=i) %}
+                        <th class="px-4 py-3 text-center">
+                            {{ ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'][i] }}
+                            <br>
+                            <span class="text-gray-500 text-sm">{{ date.strftime('%d/%m') }}</span>
+                        </th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for shift_type, shift_name in [('morning', 'Sang'), ('afternoon', 'Chieu'), ('evening', 'Toi')] %}
+                    <tr class="border-t">
+                        <td class="px-4 py-4 font-medium bg-gray-50">
+                            {{ shift_name }}
+                        </td>
+                        {% for i in range(7) %}
+                        {% set date = week_start + timedelta(days=i) %}
+                        {% set staff_list = schedule_grid[date][shift_type] if date in schedule_grid else [] %}
+                        <td class="px-4 py-4 border-l">
+                            {% if staff_list %}
+                            <div class="space-y-1">
+                                {% for item in staff_list %}
+                                <div class="text-sm px-2 py-1 bg-blue-100 rounded">
+                                    {{ item.user.full_name }}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <span class="text-gray-400 text-sm">-</span>
+                            {% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="bg-white rounded-lg shadow p-4">
+        <p class="text-sm text-gray-600">
+            <strong>Ghi chu:</strong>
+            Moi ca can toi thieu 2 nhan vien. Ca dong co the co 3 nguoi.
+        </p>
+    </div>
+</div>
+{% endblock %}

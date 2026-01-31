@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Thong tin ca nhan - HR System{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">Thong tin ca nhan</h1>
+
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="text-gray-500 text-sm">Ma nhan vien</label>
+                    <p class="font-medium">{{ user.username }}</p>
+                </div>
+                <div>
+                    <label class="text-gray-500 text-sm">Ho va ten</label>
+                    <p class="font-medium">{{ user.full_name }}</p>
+                </div>
+                <div>
+                    <label class="text-gray-500 text-sm">Email</label>
+                    <p class="font-medium">{{ user.email or '-' }}</p>
+                </div>
+                <div>
+                    <label class="text-gray-500 text-sm">So dien thoai</label>
+                    <p class="font-medium">{{ user.phone or '-' }}</p>
+                </div>
+                <div>
+                    <label class="text-gray-500 text-sm">Loai nhan vien</label>
+                    <p class="font-medium">{{ 'Full-time' if user.employment_type.value == 'full_time' else 'Part-time' }}</p>
+                </div>
+                <div>
+                    <label class="text-gray-500 text-sm">Vai tro</label>
+                    <p class="font-medium">{{ user.role.value | capitalize }}</p>
+                </div>
+                <div>
+                    <label class="text-gray-500 text-sm">Luong theo gio</label>
+                    <p class="font-medium">{{ "{:,.0f}".format(user.hourly_rate) }} VND</p>
+                </div>
+                <div>
+                    <label class="text-gray-500 text-sm">Ty le huong luong</label>
+                    <p class="font-medium">{{ user.salary_percentage }}%</p>
+                </div>
+                <div>
+                    <label class="text-gray-500 text-sm">Ho tro an ca</label>
+                    <p class="font-medium">{{ 'Co' if user.meal_support_eligible else 'Khong' }}</p>
+                </div>
+                <div>
+                    <label class="text-gray-500 text-sm">Ngay tao</label>
+                    <p class="font-medium">{{ user.created_at.strftime('%d/%m/%Y') }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-6 pt-6 border-t">
+            <a href="{{ url_for('auth.change_password') }}" class="text-blue-600 hover:underline">
+                Doi mat khau
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

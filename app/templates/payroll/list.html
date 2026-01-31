@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Bang luong - HR System{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800">Bang luong thang {{ month }}/{{ year }}</h1>
+        <div class="flex items-center space-x-4">
+            <form method="GET" class="flex items-center space-x-2">
+                <select name="month" class="px-3 py-2 border rounded-lg">
+                    {% for m in range(1, 13) %}
+                    <option value="{{ m }}" {% if m == month %}selected{% endif %}>Thang {{ m }}</option>
+                    {% endfor %}
+                </select>
+                <select name="year" class="px-3 py-2 border rounded-lg">
+                    {% for y in range(2024, 2028) %}
+                    <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Xem
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-lg shadow p-4">
+            <p class="text-gray-500 text-sm">So nhan vien</p>
+            <p class="text-2xl font-bold">{{ summary.total_employees }}</p>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4">
+            <p class="text-gray-500 text-sm">Tong luong</p>
+            <p class="text-2xl font-bold text-green-600">{{ "{:,.0f}".format(summary.total_net) }}d</p>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4">
+            <p class="text-gray-500 text-sm">Tong phat</p>
+            <p class="text-2xl font-bold text-red-600">{{ "{:,.0f}".format(summary.total_penalty) }}d</p>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4">
+            <p class="text-gray-500 text-sm">Tong thuong</p>
+            <p class="text-2xl font-bold text-blue-600">{{ "{:,.0f}".format(summary.total_reward) }}d</p>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="bg-white rounded-lg shadow p-4 flex flex-wrap gap-4">
+        <form action="{{ url_for('payroll.calculate') }}" method="POST" class="inline">
+            <input type="hidden" name="month" value="{{ month }}">
+            <input type="hidden" name="year" value="{{ year }}">
+            <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                onclick="return confirm('Tinh luong cho tat ca nhan vien?')">
+                Tinh luong
+            </button>
+        </form>
+        <a href="{{ url_for('payroll.download_report', month=month, year=year) }}"
+            class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+            Tai bao cao PDF
+        </a>
+    </div>
+
+    <!-- Payroll Table -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left">Nhan vien</th>
+                        <th class="px-4 py-3 text-right">Gio lam</th>
+                        <th class="px-4 py-3 text-right">So ca</th>
+                        <th class="px-4 py-3 text-right">Phat</th>
+                        <th class="px-4 py-3 text-right">Thuong</th>
+                        <th class="px-4 py-3 text-right">An ca</th>
+                        <th class="px-4 py-3 text-right">Thuc linh</th>
+                        <th class="px-4 py-3 text-center">Trang thai</th>
+                        <th class="px-4 py-3 text-left">Thao tac</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    {% for payroll, user in payrolls %}
+                    <tr>
+                        <td class="px-4 py-3">{{ user.full_name }}</td>
+                        <td class="px-4 py-3 text-right">{{ payroll.total_work_hours }}h</td>
+                        <td class="px-4 py-3 text-right">{{ payroll.total_shifts }}</td>
+                        <td class="px-4 py-3 text-right text-red-600">
+                            {% if payroll.total_penalty > 0 %}-{{ "{:,.0f}".format(payroll.total_penalty) }}{% else %}0{% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-right text-green-600">
+                            {% if payroll.total_reward > 0 %}+{{ "{:,.0f}".format(payroll.total_reward) }}{% else %}0{% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-right">{{ "{:,.0f}".format(payroll.meal_support_amount) }}</td>
+                        <td class="px-4 py-3 text-right font-bold">{{ "{:,.0f}".format(payroll.net_salary) }}</td>
+                        <td class="px-4 py-3 text-center">
+                            <span class="px-2 py-1 rounded text-sm
+                                {% if payroll.status.value == 'paid' %}bg-green-100 text-green-700
+                                {% elif payroll.status.value == 'approved' %}bg-blue-100 text-blue-700
+                                {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                {% if payroll.status.value == 'paid' %}Da tra
+                                {% elif payroll.status.value == 'approved' %}Da duyet
+                                {% else %}Cho duyet{% endif %}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3">
+                            <a href="{{ url_for('payroll.detail', payroll_id=payroll.id) }}" class="text-blue-600 hover:underline">
+                                Chi tiet
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="9" class="px-4 py-8 text-center text-gray-500">
+                            Chua co du lieu luong. Nhan "Tinh luong" de bat dau.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

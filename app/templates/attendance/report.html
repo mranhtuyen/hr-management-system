@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Bao cao cham cong - HR System{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800">Bao cao cham cong thang {{ month }}/{{ year }}</h1>
+        <form method="GET" class="flex items-center space-x-2">
+            <select name="month" class="px-3 py-2 border rounded-lg">
+                {% for m in range(1, 13) %}
+                <option value="{{ m }}" {% if m == month %}selected{% endif %}>Thang {{ m }}</option>
+                {% endfor %}
+            </select>
+            <select name="year" class="px-3 py-2 border rounded-lg">
+                {% for y in range(2024, 2028) %}
+                <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                Xem
+            </button>
+        </form>
+    </div>
+
+    <!-- Report Table -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left">Nhan vien</th>
+                        <th class="px-4 py-3 text-right">Gio lam</th>
+                        <th class="px-4 py-3 text-right">So ca</th>
+                        <th class="px-4 py-3 text-right">Di muon</th>
+                        <th class="px-4 py-3 text-right">Phut muon</th>
+                        <th class="px-4 py-3 text-right">Tien phat</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    {% for item in report_data %}
+                    <tr>
+                        <td class="px-4 py-3">{{ item.user.full_name }}</td>
+                        <td class="px-4 py-3 text-right">{{ item.total_hours }}h</td>
+                        <td class="px-4 py-3 text-right">{{ item.total_shifts }}</td>
+                        <td class="px-4 py-3 text-right {% if item.late_count > 0 %}text-red-600{% endif %}">
+                            {{ item.late_count }}
+                        </td>
+                        <td class="px-4 py-3 text-right {% if item.late_minutes > 0 %}text-red-600{% endif %}">
+                            {{ item.late_minutes }}
+                        </td>
+                        <td class="px-4 py-3 text-right {% if item.total_penalty > 0 %}text-red-600{% endif %}">
+                            {{ "{:,.0f}".format(item.total_penalty) }}d
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+                            Khong co du lieu.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                {% if report_data %}
+                <tfoot class="bg-gray-50 font-bold">
+                    <tr>
+                        <td class="px-4 py-3">TONG CONG</td>
+                        <td class="px-4 py-3 text-right">{{ report_data | sum(attribute='total_hours') }}h</td>
+                        <td class="px-4 py-3 text-right">{{ report_data | sum(attribute='total_shifts') }}</td>
+                        <td class="px-4 py-3 text-right text-red-600">{{ report_data | sum(attribute='late_count') }}</td>
+                        <td class="px-4 py-3 text-right text-red-600">{{ report_data | sum(attribute='late_minutes') }}</td>
+                        <td class="px-4 py-3 text-right text-red-600">
+                            {{ "{:,.0f}".format(report_data | sum(attribute='total_penalty')) }}d
+                        </td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

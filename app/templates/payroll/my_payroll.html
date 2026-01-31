@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}Luong cua toi - HR System{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <h1 class="text-2xl font-bold text-gray-800">Luong cua toi</h1>
+
+    <!-- Current Month -->
+    {% if current_payroll %}
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">Thang nay</h3>
+            <a href="{{ url_for('payroll.detail', payroll_id=current_payroll.id) }}"
+                class="text-blue-600 hover:underline">Xem chi tiet</a>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+                <p class="text-gray-500 text-sm">Gio lam</p>
+                <p class="text-xl font-bold">{{ current_payroll.total_work_hours }}h</p>
+            </div>
+            <div>
+                <p class="text-gray-500 text-sm">So ca</p>
+                <p class="text-xl font-bold">{{ current_payroll.total_shifts }}</p>
+            </div>
+            <div>
+                <p class="text-gray-500 text-sm">Phat/Thuong</p>
+                <p class="text-xl font-bold">
+                    <span class="text-red-600">-{{ "{:,.0f}".format(current_payroll.total_penalty) }}</span>
+                    /
+                    <span class="text-green-600">+{{ "{:,.0f}".format(current_payroll.total_reward) }}</span>
+                </p>
+            </div>
+            <div>
+                <p class="text-gray-500 text-sm">Thuc linh</p>
+                <p class="text-xl font-bold text-blue-600">{{ "{:,.0f}".format(current_payroll.net_salary) }}d</p>
+            </div>
+        </div>
+
+        <div class="mt-4 pt-4 border-t">
+            <span class="px-3 py-1 rounded
+                {% if current_payroll.status.value == 'paid' %}bg-green-100 text-green-700
+                {% elif current_payroll.status.value == 'approved' %}bg-blue-100 text-blue-700
+                {% else %}bg-gray-100 text-gray-700{% endif %}">
+                {% if current_payroll.status.value == 'paid' %}Da tra
+                {% elif current_payroll.status.value == 'approved' %}Da duyet
+                {% else %}Cho duyet{% endif %}
+            </span>
+        </div>
+    </div>
+    {% else %}
+    <div class="bg-white rounded-lg shadow p-6">
+        <p class="text-gray-500">Chua co du lieu luong thang nay.</p>
+    </div>
+    {% endif %}
+
+    <!-- History -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold mb-4">Lich su luong</h3>
+
+        {% if payrolls %}
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-2 text-left">Thang</th>
+                        <th class="px-4 py-2 text-right">Gio lam</th>
+                        <th class="px-4 py-2 text-right">Thuc linh</th>
+                        <th class="px-4 py-2 text-center">Trang thai</th>
+                        <th class="px-4 py-2 text-left">Thao tac</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    {% for p in payrolls %}
+                    <tr>
+                        <td class="px-4 py-3">{{ p.month }}/{{ p.year }}</td>
+                        <td class="px-4 py-3 text-right">{{ p.total_work_hours }}h</td>
+                        <td class="px-4 py-3 text-right font-medium">{{ "{:,.0f}".format(p.net_salary) }}d</td>
+                        <td class="px-4 py-3 text-center">
+                            <span class="px-2 py-1 rounded text-sm
+                                {% if p.status.value == 'paid' %}bg-green-100 text-green-700
+                                {% elif p.status.value == 'approved' %}bg-blue-100 text-blue-700
+                                {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                {% if p.status.value == 'paid' %}Da tra
+                                {% elif p.status.value == 'approved' %}Da duyet
+                                {% else %}Cho duyet{% endif %}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3">
+                            <a href="{{ url_for('payroll.detail', payroll_id=p.id) }}" class="text-blue-600 hover:underline mr-2">
+                                Chi tiet
+                            </a>
+                            <a href="{{ url_for('payroll.download_payslip', payroll_id=p.id) }}" class="text-purple-600 hover:underline">
+                                PDF
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-gray-500">Chua co lich su luong.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

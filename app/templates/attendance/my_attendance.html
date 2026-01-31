@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Cham cong ca nhan - HR System{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800">Cham cong cua toi</h1>
+        <form method="GET" class="flex items-center space-x-2">
+            <select name="month" class="px-3 py-2 border rounded-lg">
+                {% for m in range(1, 13) %}
+                <option value="{{ m }}" {% if m == month %}selected{% endif %}>Thang {{ m }}</option>
+                {% endfor %}
+            </select>
+            <select name="year" class="px-3 py-2 border rounded-lg">
+                {% for y in range(2024, 2028) %}
+                <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                Xem
+            </button>
+        </form>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-lg shadow p-4">
+            <p class="text-gray-500 text-sm">Tong gio lam</p>
+            <p class="text-2xl font-bold text-green-600">{{ total_hours }}h</p>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4">
+            <p class="text-gray-500 text-sm">So ca lam</p>
+            <p class="text-2xl font-bold">{{ total_shifts }}</p>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4">
+            <p class="text-gray-500 text-sm">Di muon</p>
+            <p class="text-2xl font-bold text-red-600">{{ late_summary.total_late }} lan</p>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4">
+            <p class="text-gray-500 text-sm">Tien phat</p>
+            <p class="text-2xl font-bold text-red-600">{{ "{:,.0f}".format(late_summary.total_penalty) }}d</p>
+        </div>
+    </div>
+
+    <!-- Records -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left">Ngay</th>
+                        <th class="px-4 py-3 text-left">Ca</th>
+                        <th class="px-4 py-3 text-left">Gio vao</th>
+                        <th class="px-4 py-3 text-left">Gio ra</th>
+                        <th class="px-4 py-3 text-left">Gio lam</th>
+                        <th class="px-4 py-3 text-left">Trang thai</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    {% for record in records %}
+                    <tr class="{% if record.is_late %}bg-red-50{% elif record.is_early_bird %}bg-green-50{% endif %}">
+                        <td class="px-4 py-3">
+                            {{ ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'][record.date.weekday()] }}
+                            {{ record.date.strftime('%d/%m') }}
+                        </td>
+                        <td class="px-4 py-3">
+                            {% if record.shift_type.value == 'morning' %}Sang
+                            {% elif record.shift_type.value == 'afternoon' %}Chieu
+                            {% else %}Toi{% endif %}
+                        </td>
+                        <td class="px-4 py-3">
+                            {{ record.actual_checkin.strftime('%H:%M') if record.actual_checkin else '-' }}
+                        </td>
+                        <td class="px-4 py-3">
+                            {{ record.actual_checkout.strftime('%H:%M') if record.actual_checkout else '-' }}
+                        </td>
+                        <td class="px-4 py-3">{{ record.total_work_hours }}h</td>
+                        <td class="px-4 py-3">
+                            {% if record.is_early_bird %}
+                            <span class="text-green-600">Guong mau</span>
+                            {% elif record.is_late %}
+                            <span class="text-red-600">Muon {{ record.late_minutes }}p</span>
+                            {% else %}
+                            <span class="text-gray-600">Dung gio</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+                            Chua co du lieu cham cong.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Late Details -->
+    {% if late_summary.violations %}
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold mb-4 text-red-600">Chi tiet di muon</h3>
+        <div class="space-y-2">
+            {% for v in late_summary.violations %}
+            <div class="flex justify-between items-center p-3 bg-red-50 rounded">
+                <div>
+                    <span class="font-medium">{{ v.date.strftime('%d/%m/%Y') }}</span>
+                    <span class="text-gray-600 ml-2">{{ v.description }}</span>
+                </div>
+                <span class="text-red-600 font-medium">-{{ "{:,.0f}".format(v.penalty_amount) }}d</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

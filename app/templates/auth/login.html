@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Dang nhap - HR System{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center -mt-20">
+    <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">HR System</h1>
+            <p class="text-gray-600 mt-2">Dang nhap de tiep tuc</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('auth.login') }}">
+            {{ form.hidden_tag() }}
+
+            <div class="mb-4">
+                <label for="username" class="block text-gray-700 font-medium mb-2">
+                    Ten dang nhap
+                </label>
+                {{ form.username(class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500", placeholder="Nhap ten dang nhap") }}
+                {% for error in form.username.errors %}
+                <p class="text-red-500 text-sm mt-1">{{ error }}</p>
+                {% endfor %}
+            </div>
+
+            <div class="mb-4">
+                <label for="password" class="block text-gray-700 font-medium mb-2">
+                    Mat khau
+                </label>
+                {{ form.password(class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500", placeholder="Nhap mat khau") }}
+                {% for error in form.password.errors %}
+                <p class="text-red-500 text-sm mt-1">{{ error }}</p>
+                {% endfor %}
+            </div>
+
+            <div class="mb-6">
+                <label class="flex items-center">
+                    {{ form.remember_me(class="mr-2") }}
+                    <span class="text-gray-700">Ghi nho dang nhap</span>
+                </label>
+            </div>
+
+            <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition font-medium">
+                Dang nhap
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
