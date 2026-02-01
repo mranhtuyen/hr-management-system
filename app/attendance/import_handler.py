@@ -35,16 +35,62 @@ def parse_time(value):
     return None
 
 
-def parse_date(value):
-    """Chuyen doi gia tri thanh date object"""
+def parse_date(value, date_format='auto', year=None):
+    """Chuyen doi gia tri thanh date object
+
+    Args:
+        value: Gia tri can parse
+        date_format: Dinh dang ngay thang ('auto', 'dd-mm', 'mm-dd', 'dd/mm', 'mm/dd', 'yyyy-mm-dd', 'dd/mm/yyyy')
+        year: Nam mac dinh neu khong co trong gia tri
+    """
+    if year is None:
+        year = datetime.now().year
+
     if isinstance(value, datetime):
         return value.date()
-    if hasattr(value, 'date'):
+    if hasattr(value, 'date') and callable(getattr(value, 'date', None)):
         return value.date()
+    if isinstance(value, date_type):
+        return value
+
     if isinstance(value, str):
-        for fmt in ['%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y']:
+        value = value.strip()
+
+        # Dinh dang cu the theo lua chon
+        format_map = {
+            'dd-mm': [('%d-%m', True)],
+            'mm-dd': [('%m-%d', True)],
+            'dd/mm': [('%d/%m', True)],
+            'mm/dd': [('%m/%d', True)],
+            'yyyy-mm-dd': [('%Y-%m-%d', False)],
+            'dd/mm/yyyy': [('%d/%m/%Y', False)],
+        }
+
+        if date_format != 'auto' and date_format in format_map:
+            for fmt, needs_year in format_map[date_format]:
+                try:
+                    parsed = datetime.strptime(value, fmt)
+                    if needs_year:
+                        return date_type(year, parsed.month, parsed.day)
+                    return parsed.date()
+                except ValueError:
+                    continue
+
+        # Tu dong nhan dien
+        formats = [
+            ('%Y-%m-%d', False),
+            ('%d/%m/%Y', False),
+            ('%d-%m-%Y', False),
+            ('%m/%d/%Y', False),
+            ('%d-%m', True),
+            ('%d/%m', True),
+        ]
+        for fmt, needs_year in formats:
             try:
-                return datetime.strptime(value.strip(), fmt).date()
+                parsed = datetime.strptime(value, fmt)
+                if needs_year:
+                    return date_type(year, parsed.month, parsed.day)
+                return parsed.date()
             except ValueError:
                 continue
     return None
@@ -306,7 +352,7 @@ def parse_checkin_checkout(cell_value):
         return times[0], times[1]
 
 
-def import_pivot_format(ws, is_openpyxl):
+def import_pivot_format(ws, is_openpyxl, date_format='auto'):
     """Import file Excel format pivot (ngay o cot)"""
     records_created = 0
     errors = []
@@ -430,12 +476,13 @@ def import_pivot_format(ws, is_openpyxl):
     }
 
 
-def import_attendance_excel(file_path):
+def import_attendance_excel(file_path, date_format='auto'):
     """
     Import file Excel cham cong
 
     Args:
         file_path: Duong dan file Excel
+        date_format: Dinh dang ngay thang ('auto', 'dd-mm', 'mm-dd', etc.)
 
     Returns:
         dict: {
@@ -452,16 +499,16 @@ def import_attendance_excel(file_path):
     file_format = detect_format(ws, is_openpyxl)
 
     if file_format == 'pivot':
-        return import_pivot_format(ws, is_openpyxl)
+        return import_pivot_format(ws, is_openpyxl, date_format)
 
     # Row format (original)
     if is_openpyxl:
-        return import_row_format_openpyxl(ws)
+        return import_row_format_openpyxl(ws, date_format)
     else:
-        return import_row_format_xlrd(ws)
+        return import_row_format_xlrd(ws, date_format)
 
 
-def import_row_format_xlrd(ws):
+def import_row_format_xlrd(ws, date_format='auto'):
     """Import file xls row format using xlrd"""
     records_created = 0
     errors = []
@@ -475,7 +522,7 @@ def import_row_format_xlrd(ws):
                 continue
 
             employee_code = str(row[0]).strip()
-            date = parse_date(row[2]) if len(row) > 2 else None
+            date = parse_date(row[2], date_format) if len(row) > 2 else None
             checkin_time = parse_time(row[3]) if len(row) > 3 else None
             checkout_time = parse_time(row[4]) if len(row) > 4 else None
 
@@ -553,7 +600,7 @@ def import_row_format_xlrd(ws):
     }
 
 
-def import_row_format_openpyxl(ws):
+def import_row_format_openpyxl(ws, date_format='auto'):
     """Import file xlsx row format using openpyxl (original logic)"""
 
     records_created = 0
@@ -569,7 +616,7 @@ def import_row_format_openpyxl(ws):
 
             employee_code = str(row[0]).strip()
             # employee_name = row[1]  # Khong can dung
-            date = parse_date(row[2])
+            date = parse_date(row[2], date_format)
             checkin_time = parse_time(row[3])
             checkout_time = parse_time(row[4]) if len(row) > 4 else None
 

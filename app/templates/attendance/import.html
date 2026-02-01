@@ -19,6 +19,20 @@
         <form method="POST" enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
+            <div class="mb-4">
+                <label class="block text-gray-700 font-medium mb-2">Dinh dang ngay thang trong file Excel</label>
+                <select name="date_format" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="auto">Tu dong nhan dien</option>
+                    <option value="dd-mm">DD-MM (01-12 = ngay 1 thang 12)</option>
+                    <option value="mm-dd">MM-DD (01-12 = thang 1 ngay 12)</option>
+                    <option value="dd/mm">DD/MM (01/12 = ngay 1 thang 12)</option>
+                    <option value="mm/dd">MM/DD (01/12 = thang 1 ngay 12)</option>
+                    <option value="yyyy-mm-dd">YYYY-MM-DD (2026-01-12)</option>
+                    <option value="dd/mm/yyyy">DD/MM/YYYY (12/01/2026)</option>
+                </select>
+                <p class="text-gray-500 text-sm mt-1">Chon dinh dang phu hop voi file Excel cua ban</p>
+            </div>
+
             <div class="mb-6">
                 <label class="block text-gray-700 font-medium mb-2">Chon file Excel</label>
                 <input type="file" name="file" accept=".xlsx,.xls"

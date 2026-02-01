@@ -71,11 +71,22 @@ class User(UserMixin, db.Model):
     phone = db.Column(db.String(20))
     email = db.Column(db.String(100))
 
+    # Thong tin bo sung
+    cccd = db.Column(db.String(20))  # Can cuoc cong dan
+    address_permanent = db.Column(db.String(255))  # Dia chi nguyen quan
+    address_current = db.Column(db.String(255))  # Dia chi hien tai
+
     role = db.Column(db.Enum(UserRole), nullable=False, default=UserRole.STAFF)
     employment_type = db.Column(db.Enum(EmploymentType), nullable=False, default=EmploymentType.PART_TIME)
     hourly_rate = db.Column(db.Float, nullable=False, default=30000)  # Luong gio (VND)
     salary_percentage = db.Column(db.Float, default=100.0)  # 90% thu viec, 100% chinh thuc
     meal_support_eligible = db.Column(db.Boolean, default=False)  # Duoc ho tro an ca
+
+    # Thong tin thu viec
+    is_probation = db.Column(db.Boolean, default=False)  # Dang thu viec
+    probation_salary_rate = db.Column(db.Float, default=85.0)  # Ty le luong thu viec (%)
+    probation_start_date = db.Column(db.Date)  # Ngay bat dau thu viec
+    probation_end_date = db.Column(db.Date)  # Ngay ket thuc thu viec
 
     status = db.Column(db.String(20), default='active')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -311,3 +322,63 @@ class Notification(db.Model):
 
     def __repr__(self):
         return f'<Notification {self.user_id} - {self.title}>'
+
+
+class ActivityLog(db.Model):
+    """Log hoat dong cua user (dang nhap, them, sua, xoa)"""
+    __tablename__ = 'activity_logs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    action = db.Column(db.String(50), nullable=False)  # 'login', 'create', 'update', 'delete'
+    entity_type = db.Column(db.String(50))  # 'user', 'schedule', 'attendance', 'payroll'
+    entity_id = db.Column(db.Integer)
+    description = db.Column(db.Text)
+    ip_address = db.Column(db.String(50))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref='activity_logs')
+
+    @staticmethod
+    def log(user_id, action, entity_type=None, entity_id=None, description=None, ip_address=None):
+        """Tao log moi"""
+        log = ActivityLog(
+            user_id=user_id,
+            action=action,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            description=description,
+            ip_address=ip_address
+        )
+        db.session.add(log)
+        db.session.commit()
+        return log
+
+    def __repr__(self):
+        return f'<ActivityLog {self.user_id} - {self.action}>'
+
+
+class ScheduleSettings(db.Model):
+    """Cai dat lich dang ky"""
+    __tablename__ = 'schedule_settings'
+
+    id = db.Column(db.Integer, primary_key=True)
+    deadline_day = db.Column(db.Integer, default=6)  # Thu 7 (0=Mon, 6=Sun)
+    deadline_hour = db.Column(db.Integer, default=18)  # 18h
+    deadline_minute = db.Column(db.Integer, default=0)
+    late_registration_message = db.Column(db.Text, default='Ban da dang ky muon, Hay luu y.')
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    @staticmethod
+    def get_settings():
+        """Lay cai dat hien tai"""
+        settings = ScheduleSettings.query.first()
+        if not settings:
+            settings = ScheduleSettings()
+            db.session.add(settings)
+            db.session.commit()
+        return settings
+
+    def __repr__(self):
+        return f'<ScheduleSettings deadline={self.deadline_day} {self.deadline_hour}:{self.deadline_minute}>'

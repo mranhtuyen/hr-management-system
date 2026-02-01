@@ -52,8 +52,9 @@ def import_page():
             filepath = os.path.join(upload_folder, filename)
             file.save(filepath)
 
-            # Import du lieu
-            result = import_attendance_excel(filepath)
+            # Import du lieu voi date format
+            date_format = request.form.get('date_format', 'auto')
+            result = import_attendance_excel(filepath, date_format=date_format)
 
             if result['success'] > 0:
                 flash(f"Import thanh cong {result['success']} ban ghi.", 'success')

@@ -53,6 +53,12 @@ def create_app(config_class=Config):
     from app.payroll import bp as payroll_bp
     app.register_blueprint(payroll_bp, url_prefix='/payroll')
 
+    from app.export import bp as export_bp
+    app.register_blueprint(export_bp, url_prefix='/export')
+
+    from app.logs import bp as logs_bp
+    app.register_blueprint(logs_bp, url_prefix='/logs')
+
     # Root route
     @app.route('/')
     def index():

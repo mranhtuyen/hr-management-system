@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, BooleanField, SubmitField, SelectField, FloatField
-from wtforms.validators import DataRequired, Email, EqualTo, ValidationError, Optional
+from wtforms import StringField, PasswordField, BooleanField, SubmitField, SelectField, FloatField, TextAreaField, DateField
+from wtforms.validators import DataRequired, Email, EqualTo, ValidationError, Optional, Length
 from app.models import User, UserRole, EmploymentType
 
 
@@ -21,6 +21,11 @@ class RegisterForm(FlaskForm):
     password = PasswordField('Mat khau', validators=[DataRequired()])
     password2 = PasswordField('Xac nhan mat khau', validators=[DataRequired(), EqualTo('password')])
 
+    # Thong tin bo sung
+    cccd = StringField('CCCD', validators=[Optional(), Length(max=20)])
+    address_permanent = StringField('Dia chi nguyen quan', validators=[Optional()])
+    address_current = StringField('Dia chi hien tai', validators=[Optional()])
+
     role = SelectField('Vai tro', choices=[
         (UserRole.STAFF.value, 'Nhan vien'),
         (UserRole.MANAGER.value, 'Quan ly'),
@@ -35,6 +40,12 @@ class RegisterForm(FlaskForm):
     hourly_rate = FloatField('Luong theo gio (VND)', validators=[DataRequired()], default=30000)
     salary_percentage = FloatField('Ty le luong (%)', validators=[DataRequired()], default=100.0)
     meal_support_eligible = BooleanField('Duoc ho tro an ca')
+
+    # Thong tin thu viec
+    is_probation = BooleanField('Dang thu viec')
+    probation_salary_rate = FloatField('Ty le luong thu viec (%)', validators=[Optional()], default=85.0)
+    probation_start_date = DateField('Ngay bat dau thu viec', validators=[Optional()])
+    probation_end_date = DateField('Ngay ket thuc thu viec', validators=[Optional()])
 
     submit = SubmitField('Tao tai khoan')
 
@@ -58,6 +69,11 @@ class EditUserForm(FlaskForm):
     email = StringField('Email', validators=[Optional(), Email()])
     phone = StringField('So dien thoai', validators=[Optional()])
 
+    # Thong tin bo sung
+    cccd = StringField('CCCD', validators=[Optional(), Length(max=20)])
+    address_permanent = StringField('Dia chi nguyen quan', validators=[Optional()])
+    address_current = StringField('Dia chi hien tai', validators=[Optional()])
+
     role = SelectField('Vai tro', choices=[
         (UserRole.STAFF.value, 'Nhan vien'),
         (UserRole.MANAGER.value, 'Quan ly'),
@@ -72,9 +88,20 @@ class EditUserForm(FlaskForm):
     hourly_rate = FloatField('Luong theo gio (VND)', validators=[DataRequired()])
     salary_percentage = FloatField('Ty le luong (%)', validators=[DataRequired()])
     meal_support_eligible = BooleanField('Duoc ho tro an ca')
+
+    # Thong tin thu viec
+    is_probation = BooleanField('Dang thu viec')
+    probation_salary_rate = FloatField('Ty le luong thu viec (%)', validators=[Optional()], default=85.0)
+    probation_start_date = DateField('Ngay bat dau thu viec', validators=[Optional()])
+    probation_end_date = DateField('Ngay ket thuc thu viec', validators=[Optional()])
+
     status = SelectField('Trang thai', choices=[
         ('active', 'Dang lam viec'),
         ('inactive', 'Da nghi viec')
     ])
+
+    # Doi mat khau (optional)
+    new_password = PasswordField('Mat khau moi', validators=[Optional()])
+    new_password2 = PasswordField('Xac nhan mat khau moi', validators=[Optional(), EqualTo('new_password', message='Mat khau xac nhan khong khop')])
 
     submit = SubmitField('Cap nhat')

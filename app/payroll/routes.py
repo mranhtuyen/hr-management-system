@@ -83,8 +83,9 @@ def detail(payroll_id):
     user = User.query.get(payroll.user_id)
 
     # Lay chi tiet vi pham va thuong
-    from datetime import date as date_type
-    from app.models import Violation, Reward
+    from datetime import date as date_type, timedelta
+    from app.models import Violation, Reward, AttendanceRecord, ScheduleShift, WorkSchedule
+    import calendar
 
     month_start = date_type(payroll.year, payroll.month, 1)
     if payroll.month == 12:
@@ -104,11 +105,67 @@ def detail(payroll_id):
         Reward.created_at < datetime(payroll.year, payroll.month + 1, 1) if payroll.month < 12 else datetime(payroll.year + 1, 1, 1)
     ).all()
 
+    # Lay chi tiet cham cong hang ngay
+    attendance_records = AttendanceRecord.query.filter(
+        AttendanceRecord.user_id == payroll.user_id,
+        AttendanceRecord.date >= month_start,
+        AttendanceRecord.date < month_end
+    ).order_by(AttendanceRecord.date).all()
+
+    # Lay lich lam viec da duyet
+    schedules = WorkSchedule.query.filter(
+        WorkSchedule.user_id == payroll.user_id,
+        WorkSchedule.week_start_date >= month_start,
+        WorkSchedule.week_start_date < month_end
+    ).all()
+
+    # Tao du lieu chi tiet hang ngay
+    days_in_month = calendar.monthrange(payroll.year, payroll.month)[1]
+    daily_details = []
+
+    for day in range(1, days_in_month + 1):
+        current_date = date_type(payroll.year, payroll.month, day)
+
+        # Tim cham cong ngay nay
+        day_attendance = [a for a in attendance_records if a.date == current_date]
+
+        # Tim lich lam viec ngay nay
+        day_shifts = []
+        for schedule in schedules:
+            for shift in schedule.shifts:
+                if shift.date == current_date and shift.is_confirmed:
+                    day_shifts.append(shift)
+
+        # Tinh so bua an
+        meals = len(day_attendance) if user.meal_support_eligible else 0
+
+        if day_attendance or day_shifts:
+            daily_details.append({
+                'date': current_date,
+                'shifts': day_shifts,
+                'attendance': day_attendance,
+                'total_hours': sum(a.total_work_hours for a in day_attendance),
+                'meals': meals,
+                'is_late': any(a.is_late for a in day_attendance)
+            })
+
+    # Phan trang (10 ngay/trang)
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+    total_pages = (len(daily_details) + per_page - 1) // per_page
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    paginated_details = daily_details[start_idx:end_idx]
+
     return render_template('payroll/detail.html',
                            payroll=payroll,
                            user=user,
                            violations=violations,
-                           rewards=rewards)
+                           rewards=rewards,
+                           daily_details=paginated_details,
+                           page=page,
+                           total_pages=total_pages,
+                           total_days=len(daily_details))
 
 
 @bp.route('/my-payroll')
@@ -235,5 +292,33 @@ def update_advance(payroll_id):
 
     db.session.commit()
     flash('Da cap nhat tien tam ung.', 'success')
+
+    return redirect(url_for('payroll.detail', payroll_id=payroll_id))
+
+
+@bp.route('/update-salary/<int:payroll_id>', methods=['POST'])
+@login_required
+@admin_required
+def update_salary(payroll_id):
+    """Cap nhat chi tiet luong"""
+    payroll = Payroll.query.get_or_404(payroll_id)
+
+    payroll.gross_salary = request.form.get('gross_salary', type=float, default=payroll.gross_salary)
+    payroll.meal_support_amount = request.form.get('meal_support_amount', type=float, default=payroll.meal_support_amount)
+    payroll.total_reward = request.form.get('total_reward', type=float, default=payroll.total_reward)
+    payroll.total_penalty = request.form.get('total_penalty', type=float, default=payroll.total_penalty)
+    payroll.advance_payment = request.form.get('advance_payment', type=float, default=payroll.advance_payment)
+
+    # Tinh lai luong thuc linh
+    payroll.net_salary = (
+        payroll.gross_salary +
+        payroll.meal_support_amount +
+        payroll.total_reward -
+        payroll.total_penalty -
+        payroll.advance_payment
+    )
+
+    db.session.commit()
+    flash('Da cap nhat chi tiet luong.', 'success')
 
     return redirect(url_for('payroll.detail', payroll_id=payroll_id))

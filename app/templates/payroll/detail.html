@@ -3,7 +3,7 @@
 {% block title %}Chi tiet luong - HR System{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto space-y-6">
+<div class="max-w-5xl mx-auto space-y-6">
     <div class="flex justify-between items-center">
         <h1 class="text-2xl font-bold text-gray-800">Phieu luong thang {{ payroll.month }}/{{ payroll.year }}</h1>
         <a href="{{ url_for('payroll.download_payslip', payroll_id=payroll.id) }}"
@@ -35,45 +35,194 @@
         </div>
     </div>
 
+    <!-- Daily Details Table -->
+    {% if daily_details %}
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">Chi tiet cham cong hang ngay</h3>
+            <span class="text-gray-500 text-sm">Tong: {{ total_days }} ngay lam viec</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-3 py-2 text-left">Ngay</th>
+                        <th class="px-3 py-2 text-left">Ca duoc duyet</th>
+                        <th class="px-3 py-2 text-left">Gio vao</th>
+                        <th class="px-3 py-2 text-left">Gio ra</th>
+                        <th class="px-3 py-2 text-right">So gio</th>
+                        <th class="px-3 py-2 text-center">Bua an</th>
+                        <th class="px-3 py-2 text-center">Trang thai</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    {% for day in daily_details %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-3 py-2 font-medium">{{ day.date.strftime('%d/%m') }}</td>
+                        <td class="px-3 py-2">
+                            {% for shift in day.shifts %}
+                            <span class="px-2 py-1 rounded text-xs
+                                {% if shift.shift_type.value == 'morning' %}bg-yellow-100 text-yellow-700
+                                {% elif shift.shift_type.value == 'afternoon' %}bg-blue-100 text-blue-700
+                                {% else %}bg-purple-100 text-purple-700{% endif %}">
+                                {{ shift.shift_type.value }}
+                            </span>
+                            {% endfor %}
+                            {% if not day.shifts %}-{% endif %}
+                        </td>
+                        <td class="px-3 py-2">
+                            {% for a in day.attendance %}
+                            {{ a.actual_checkin.strftime('%H:%M') if a.actual_checkin else '-' }}{% if not loop.last %}, {% endif %}
+                            {% endfor %}
+                            {% if not day.attendance %}-{% endif %}
+                        </td>
+                        <td class="px-3 py-2">
+                            {% for a in day.attendance %}
+                            {{ a.actual_checkout.strftime('%H:%M') if a.actual_checkout else '-' }}{% if not loop.last %}, {% endif %}
+                            {% endfor %}
+                            {% if not day.attendance %}-{% endif %}
+                        </td>
+                        <td class="px-3 py-2 text-right">{{ "%.1f"|format(day.total_hours) }}h</td>
+                        <td class="px-3 py-2 text-center">{{ day.meals }}</td>
+                        <td class="px-3 py-2 text-center">
+                            {% if day.is_late %}
+                            <span class="px-2 py-1 bg-red-100 text-red-700 rounded text-xs">Di muon</span>
+                            {% else %}
+                            <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">OK</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if total_pages > 1 %}
+        <div class="flex justify-center mt-4 space-x-2">
+            {% if page > 1 %}
+            <a href="{{ url_for('payroll.detail', payroll_id=payroll.id, page=page-1) }}"
+                class="px-3 py-1 border rounded hover:bg-gray-100">Truoc</a>
+            {% endif %}
+
+            {% for p in range(1, total_pages + 1) %}
+            <a href="{{ url_for('payroll.detail', payroll_id=payroll.id, page=p) }}"
+                class="px-3 py-1 border rounded {% if p == page %}bg-blue-600 text-white{% else %}hover:bg-gray-100{% endif %}">
+                {{ p }}
+            </a>
+            {% endfor %}
+
+            {% if page < total_pages %}
+            <a href="{{ url_for('payroll.detail', payroll_id=payroll.id, page=page+1) }}"
+                class="px-3 py-1 border rounded hover:bg-gray-100">Sau</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
     <!-- Salary Details -->
     <div class="bg-white rounded-lg shadow p-6">
-        <h3 class="text-lg font-semibold mb-4">Chi tiet luong</h3>
-        <table class="w-full">
-            <tbody class="divide-y">
-                <tr>
-                    <td class="py-2">Tong gio lam viec</td>
-                    <td class="py-2 text-right">{{ payroll.total_work_hours }} gio</td>
-                </tr>
-                <tr>
-                    <td class="py-2">So ca lam</td>
-                    <td class="py-2 text-right">{{ payroll.total_shifts }} ca</td>
-                </tr>
-                <tr>
-                    <td class="py-2">Luong gop</td>
-                    <td class="py-2 text-right">{{ "{:,.0f}".format(payroll.gross_salary) }}d</td>
-                </tr>
-                <tr>
-                    <td class="py-2">Tien an ca</td>
-                    <td class="py-2 text-right text-green-600">+{{ "{:,.0f}".format(payroll.meal_support_amount) }}d</td>
-                </tr>
-                <tr>
-                    <td class="py-2">Tien thuong</td>
-                    <td class="py-2 text-right text-green-600">+{{ "{:,.0f}".format(payroll.total_reward) }}d</td>
-                </tr>
-                <tr>
-                    <td class="py-2">Tien phat ({{ payroll.late_count }} lan di muon)</td>
-                    <td class="py-2 text-right text-red-600">-{{ "{:,.0f}".format(payroll.total_penalty) }}d</td>
-                </tr>
-                <tr>
-                    <td class="py-2">Tien tam ung</td>
-                    <td class="py-2 text-right text-red-600">-{{ "{:,.0f}".format(payroll.advance_payment) }}d</td>
-                </tr>
-                <tr class="font-bold text-lg">
-                    <td class="py-3">THUC LINH</td>
-                    <td class="py-3 text-right text-blue-600">{{ "{:,.0f}".format(payroll.net_salary) }}d</td>
-                </tr>
-            </tbody>
-        </table>
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">Chi tiet luong</h3>
+            {% if current_user.role.value == 'admin' %}
+            <button onclick="toggleEditSalary()" class="text-blue-600 hover:underline text-sm">
+                Chinh sua
+            </button>
+            {% endif %}
+        </div>
+
+        <!-- View mode -->
+        <div id="salary_view">
+            <table class="w-full">
+                <tbody class="divide-y">
+                    <tr>
+                        <td class="py-2">Tong gio lam viec</td>
+                        <td class="py-2 text-right">{{ payroll.total_work_hours }} gio</td>
+                    </tr>
+                    <tr>
+                        <td class="py-2">So ca lam</td>
+                        <td class="py-2 text-right">{{ payroll.total_shifts }} ca</td>
+                    </tr>
+                    <tr>
+                        <td class="py-2">Luong gop</td>
+                        <td class="py-2 text-right">{{ "{:,.0f}".format(payroll.gross_salary) }}d</td>
+                    </tr>
+                    <tr>
+                        <td class="py-2">Tien an ca</td>
+                        <td class="py-2 text-right text-green-600">+{{ "{:,.0f}".format(payroll.meal_support_amount) }}d</td>
+                    </tr>
+                    <tr>
+                        <td class="py-2">Tien thuong</td>
+                        <td class="py-2 text-right text-green-600">+{{ "{:,.0f}".format(payroll.total_reward) }}d</td>
+                    </tr>
+                    <tr>
+                        <td class="py-2">Tien phat ({{ payroll.late_count }} lan di muon)</td>
+                        <td class="py-2 text-right text-red-600">-{{ "{:,.0f}".format(payroll.total_penalty) }}d</td>
+                    </tr>
+                    <tr>
+                        <td class="py-2">Tien tam ung</td>
+                        <td class="py-2 text-right text-red-600">-{{ "{:,.0f}".format(payroll.advance_payment) }}d</td>
+                    </tr>
+                    <tr class="font-bold text-lg">
+                        <td class="py-3">THUC LINH</td>
+                        <td class="py-3 text-right text-blue-600">{{ "{:,.0f}".format(payroll.net_salary) }}d</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Edit mode (Admin only) -->
+        {% if current_user.role.value == 'admin' %}
+        <div id="salary_edit" style="display: none;">
+            <form action="{{ url_for('payroll.update_salary', payroll_id=payroll.id) }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <table class="w-full">
+                    <tbody class="divide-y">
+                        <tr>
+                            <td class="py-2">Luong gop</td>
+                            <td class="py-2 text-right">
+                                <input type="number" name="gross_salary" value="{{ payroll.gross_salary }}"
+                                    class="w-32 px-2 py-1 border rounded text-right">
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="py-2">Tien an ca</td>
+                            <td class="py-2 text-right">
+                                <input type="number" name="meal_support_amount" value="{{ payroll.meal_support_amount }}"
+                                    class="w-32 px-2 py-1 border rounded text-right">
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="py-2">Tien thuong</td>
+                            <td class="py-2 text-right">
+                                <input type="number" name="total_reward" value="{{ payroll.total_reward }}"
+                                    class="w-32 px-2 py-1 border rounded text-right">
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="py-2">Tien phat</td>
+                            <td class="py-2 text-right">
+                                <input type="number" name="total_penalty" value="{{ payroll.total_penalty }}"
+                                    class="w-32 px-2 py-1 border rounded text-right">
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="py-2">Tien tam ung</td>
+                            <td class="py-2 text-right">
+                                <input type="number" name="advance_payment" value="{{ payroll.advance_payment }}"
+                                    class="w-32 px-2 py-1 border rounded text-right">
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="flex justify-end mt-4 space-x-2">
+                    <button type="button" onclick="toggleEditSalary()" class="px-4 py-2 border rounded">Huy</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Luu</button>
+                </div>
+            </form>
+        </div>
+        {% endif %}
     </div>
 
     <!-- Violations -->
@@ -119,6 +268,7 @@
         <div class="flex flex-wrap gap-4">
             {% if payroll.status.value == 'draft' %}
             <form action="{{ url_for('payroll.approve', payroll_id=payroll.id) }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
                     Duyet luong
                 </button>
@@ -127,6 +277,7 @@
 
             {% if payroll.status.value == 'approved' %}
             <form action="{{ url_for('payroll.mark_paid', payroll_id=payroll.id) }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
                     Danh dau da tra
                 </button>
@@ -135,6 +286,7 @@
 
             <form action="{{ url_for('payroll.update_advance', payroll_id=payroll.id) }}" method="POST"
                 class="flex items-center space-x-2">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="number" name="advance_payment" value="{{ payroll.advance_payment }}"
                     class="px-3 py-2 border rounded-lg w-32" placeholder="Tam ung">
                 <button type="submit" class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700">
@@ -157,4 +309,18 @@
         </span>
     </div>
 </div>
+
+<script>
+function toggleEditSalary() {
+    var viewDiv = document.getElementById('salary_view');
+    var editDiv = document.getElementById('salary_edit');
+    if (viewDiv.style.display === 'none') {
+        viewDiv.style.display = 'block';
+        editDiv.style.display = 'none';
+    } else {
+        viewDiv.style.display = 'none';
+        editDiv.style.display = 'block';
+    }
+}
+</script>
 {% endblock %}

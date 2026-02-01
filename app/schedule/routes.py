@@ -6,7 +6,7 @@ from app.schedule.forms import WeeklyScheduleForm
 from app.schedule.auto_scheduler import auto_generate_schedule
 from app.models import (
     WorkSchedule, ScheduleShift, User, ShiftType, ScheduleStatus,
-    UserRole, EmploymentType, db
+    UserRole, EmploymentType, ScheduleSettings, db
 )
 from app.auth.routes import manager_required, admin_required
 
@@ -34,13 +34,41 @@ def get_next_week_dates():
 def is_registration_open():
     """Kiem tra dang ky lich con mo khong"""
     now = datetime.now()
-    # Mo tu Thu 6, dong luc 18h Thu 7
+    settings = ScheduleSettings.get_settings()
+
+    # Mac dinh: Mo tu Thu 6, dong luc 18h Thu 7
+    deadline_day = settings.deadline_day  # 0=Mon, 5=Sat, 6=Sun
+    deadline_hour = settings.deadline_hour
+    deadline_minute = settings.deadline_minute
+
     # Weekday: 0=Mon, 4=Fri, 5=Sat, 6=Sun
-    if now.weekday() == 4:  # Friday
+    if now.weekday() == 4:  # Friday - luon mo
         return True
-    elif now.weekday() == 5:  # Saturday
-        return now.hour < 18
+    elif now.weekday() == deadline_day:
+        if now.hour < deadline_hour:
+            return True
+        elif now.hour == deadline_hour and now.minute < deadline_minute:
+            return True
     return False
+
+
+def check_late_registration():
+    """Kiem tra xem dang ky co muon khong"""
+    now = datetime.now()
+    settings = ScheduleSettings.get_settings()
+
+    deadline_day = settings.deadline_day
+    deadline_hour = settings.deadline_hour
+    deadline_minute = settings.deadline_minute
+
+    # Neu la ngay deadline va qua gio deadline
+    if now.weekday() == deadline_day:
+        if now.hour > deadline_hour:
+            return True, settings.late_registration_message
+        elif now.hour == deadline_hour and now.minute >= deadline_minute:
+            return True, settings.late_registration_message
+
+    return False, None
 
 
 @bp.route('/register', methods=['GET', 'POST'])
@@ -553,3 +581,27 @@ def delete_shift(shift_id):
     db.session.commit()
     flash('Da xoa ca lam viec.', 'success')
     return redirect(url_for('schedule.view'))
+
+
+@bp.route('/settings', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def settings():
+    """Cai dat thoi gian dang ky lich"""
+    schedule_settings = ScheduleSettings.get_settings()
+
+    if request.method == 'POST':
+        schedule_settings.deadline_day = request.form.get('deadline_day', type=int, default=5)
+        schedule_settings.deadline_hour = request.form.get('deadline_hour', type=int, default=18)
+        schedule_settings.deadline_minute = request.form.get('deadline_minute', type=int, default=0)
+        schedule_settings.late_registration_message = request.form.get('late_message', 'Ban da dang ky muon, Hay luu y.')
+        schedule_settings.updated_by = current_user.id
+
+        db.session.commit()
+        flash('Da cap nhat cai dat thanh cong!', 'success')
+        return redirect(url_for('schedule.settings'))
+
+    days = ['Thu 2', 'Thu 3', 'Thu 4', 'Thu 5', 'Thu 6', 'Thu 7', 'Chu nhat']
+    return render_template('schedule/settings.html',
+                           settings=schedule_settings,
+                           days=days)

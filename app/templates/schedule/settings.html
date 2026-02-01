@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Cai dat lich - HR System{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">Cai dat dang ky lich</h1>
+
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="mb-6 p-4 bg-blue-50 rounded-lg">
+                <h3 class="font-semibold text-blue-800 mb-2">Mo ta:</h3>
+                <p class="text-sm text-blue-700">
+                    Nhan vien co the dang ky lich lam viec tu Thu 6 den truoc thoi han duoc cai dat ben duoi.
+                    Sau thoi han, viec dang ky se bi khoa.
+                </p>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-gray-700 font-medium mb-2">Han chot dang ky</label>
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-500 mb-1">Ngay</label>
+                        <select name="deadline_day" class="w-full px-4 py-2 border rounded-lg">
+                            {% for i, day in enumerate(days) %}
+                            <option value="{{ i }}" {% if settings.deadline_day == i %}selected{% endif %}>
+                                {{ day }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-500 mb-1">Gio</label>
+                        <select name="deadline_hour" class="w-full px-4 py-2 border rounded-lg">
+                            {% for h in range(24) %}
+                            <option value="{{ h }}" {% if settings.deadline_hour == h %}selected{% endif %}>
+                                {{ "%02d"|format(h) }}h
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-500 mb-1">Phut</label>
+                        <select name="deadline_minute" class="w-full px-4 py-2 border rounded-lg">
+                            {% for m in [0, 15, 30, 45] %}
+                            <option value="{{ m }}" {% if settings.deadline_minute == m %}selected{% endif %}>
+                                {{ "%02d"|format(m) }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <p class="text-gray-500 text-sm mt-2">
+                    Hien tai: {{ days[settings.deadline_day] }} luc {{ "%02d:%02d"|format(settings.deadline_hour, settings.deadline_minute) }}
+                </p>
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-gray-700 font-medium mb-2">Thong bao dang ky muon</label>
+                <textarea name="late_message" rows="3"
+                    class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Nhap thong bao hien thi khi dang ky muon">{{ settings.late_registration_message }}</textarea>
+                <p class="text-gray-500 text-sm mt-1">
+                    Thong bao nay se hien thi cho nhung nhan vien dang ky sau thoi han
+                </p>
+            </div>
+
+            <div class="flex justify-end space-x-4">
+                <a href="{{ url_for('dashboard.index') }}" class="px-4 py-2 border rounded-lg hover:bg-gray-100 transition">
+                    Huy
+                </a>
+                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                    Luu cai dat
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

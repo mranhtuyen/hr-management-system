@@ -53,14 +53,33 @@
                         </span>
                     </td>
                     <td class="px-4 py-3">
-                        <a href="{{ url_for('auth.edit_user', user_id=user.id) }}" class="text-blue-600 hover:underline mr-2">
-                            Sua
-                        </a>
-                        <form action="{{ url_for('auth.reset_password', user_id=user.id) }}" method="POST" class="inline">
-                            <button type="submit" class="text-orange-600 hover:underline" onclick="return confirm('Reset mat khau cho {{ user.full_name }}?')">
-                                Reset MK
-                            </button>
-                        </form>
+                        <div class="flex flex-wrap gap-2">
+                            <a href="{{ url_for('auth.edit_user', user_id=user.id) }}" class="text-blue-600 hover:underline">
+                                Sua
+                            </a>
+                            <form action="{{ url_for('auth.reset_password', user_id=user.id) }}" method="POST" class="inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="text-orange-600 hover:underline" onclick="return confirm('Reset mat khau cho {{ user.full_name }}?')">
+                                    Reset MK
+                                </button>
+                            </form>
+                            {% if user.id != current_user.id %}
+                            <form action="{{ url_for('auth.toggle_user_status', user_id=user.id) }}" method="POST" class="inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="{% if user.status == 'active' %}text-yellow-600{% else %}text-green-600{% endif %} hover:underline"
+                                    onclick="return confirm('{% if user.status == 'active' %}Vo hieu hoa{% else %}Kich hoat{% endif %} tai khoan {{ user.full_name }}?')">
+                                    {% if user.status == 'active' %}Khoa{% else %}Mo khoa{% endif %}
+                                </button>
+                            </form>
+                            <form action="{{ url_for('auth.delete_user', user_id=user.id) }}" method="POST" class="inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="text-red-600 hover:underline"
+                                    onclick="return confirm('XOA VINH VIEN tai khoan {{ user.full_name }}? Hanh dong nay khong the hoan tac!')">
+                                    Xoa
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}

@@ -1,0 +1,104 @@
+BAO CAO CAP NHAT HE THONG HR MANAGEMENT
+======================================
+Ngay: 2026-02-01
+
+YEU CAU TU ERROR.TXT:
+=====================
+
+(1) Import - Dinh dang ngay thang Excel
+    [DA HOAN THANH] - Cho phep cai dat dinh dang ngay truoc khi import
+    - File: app/attendance/import_handler.py - parse_date() ho tro nhieu format
+    - File: app/attendance/routes.py - truyen date_format tu form
+    - File: app/templates/attendance/import.html - them dropdown chon format
+
+(2) Payroll Detail - Nang cap phieu luong
+    [DA HOAN THANH]
+    - Hien thi bang chi tiet cham cong hang ngay (lich duyet, gio vao/ra, so gio, bua an)
+    - Phan trang 10 ngay/trang
+    - Cho phep Admin chinh sua chi tiet luong (gross_salary, reward, penalty...)
+    - Fix loi CSRF token cho approve, mark_paid, update_advance
+    - File: app/payroll/routes.py - them daily_details, update_salary route
+    - File: app/templates/payroll/detail.html - UI moi voi bang hang ngay
+
+(3) Danh sach Nhan vien - Bo sung thong tin
+    [DA HOAN THANH]
+    - Them truong: CCCD, Dia chi nguyen quan, Dia chi hien tai
+    - Them thong tin thu viec: is_probation, probation_salary_rate, probation_start/end_date
+    - Cho phep Boss doi mat khau cho nhan vien (trong form edit)
+    - Them nut Khoa/Mo khoa tai khoan
+    - Them nut Xoa vinh vien tai khoan
+    - Fix loi CSRF token cho reset-password
+    - File: app/models.py - them cac truong moi vao User
+    - File: app/auth/forms.py - cap nhat RegisterForm, EditUserForm
+    - File: app/auth/routes.py - cap nhat register, edit_user, them toggle_user_status, delete_user
+    - File: app/templates/auth/register.html - UI moi voi cac truong bo sung
+    - File: app/templates/auth/edit_user.html - UI moi voi doi mat khau
+    - File: app/templates/auth/users.html - them nut Xoa
+
+(4) Phan quyen chi tiet
+    [CHUA HOAN THANH - Can phat trien them]
+    - Hien tai co 3 role: Staff, Manager, Admin
+    - Can them bang Permission va UI quan ly chi tiet
+
+(5) Cai dat gio dang ky lich
+    [DA HOAN THANH]
+    - Them model ScheduleSettings (deadline_day, deadline_hour, deadline_minute, late_message)
+    - Route: /schedule/settings - cho phep Boss cai dat thoi han dang ky
+    - Cap nhat is_registration_open() su dung settings tu database
+    - File: app/models.py - them ScheduleSettings model
+    - File: app/schedule/routes.py - them settings route, cap nhat is_registration_open
+    - File: app/templates/schedule/settings.html - UI cai dat
+
+(6) Xuat Excel
+    [DA HOAN THANH]
+    - Tao module app/export voi 3 route:
+      * /export/schedule-matrix - Xuat ma tran lich dang ky theo tuan
+      * /export/attendance - Xuat bang cham cong theo thang
+      * /export/payroll - Xuat bang luong theo thang
+    - File: app/export/__init__.py, app/export/routes.py
+
+(7) Log hoat dong
+    [DA HOAN THANH]
+    - Them model ActivityLog ghi nhan: login, create, update, delete
+    - Tao module app/logs voi route:
+      * /logs/ - Xem log theo ngay
+      * /logs/all - Xem tat ca log (phan trang)
+    - Tich hop log vao cac route: login, register, edit_user, toggle_user_status, delete_user
+    - File: app/models.py - them ActivityLog model
+    - File: app/logs/__init__.py, app/logs/routes.py
+    - File: app/templates/logs/index.html, app/templates/logs/all.html
+    - File: app/auth/routes.py - them ActivityLog.log() vao cac action
+
+MENU HE THONG (Admin):
+======================
+- Them dropdown "He thong" trong navigation voi:
+  * Cai dat lich
+  * Log hoat dong
+  * Xuat lich (Excel)
+  * Xuat cham cong
+  * Xuat bang luong
+- File: app/templates/base.html
+
+DATABASE:
+=========
+- Da tao cac table moi: activity_logs, schedule_settings
+- Them cac column moi vao users: cccd, address_permanent, address_current,
+  is_probation, probation_salary_rate, probation_start_date, probation_end_date
+
+CAN LAM THEM:
+=============
+1. (4) Phan quyen chi tiet - Can tao bang Permission va UI
+2. Notification cho dang ky muon (hien thi khi NV dang ky sau deadline)
+3. Export chi tiet hon (them columns, format dep hon)
+4. Test ky luong hon cac chuc nang moi
+
+HOT FIX DA AP DUNG:
+==================
+- CSRF token cho /payroll/approve, /payroll/mark-paid, /payroll/update-advance
+- CSRF token cho /auth/reset-password
+- CSRF token cho /auth/toggle-user-status, /auth/delete-user
+
+SERVER STATUS:
+=============
+- Server dang chay tai: http://127.0.0.1:5000
+- Admin login: admin / admin123
