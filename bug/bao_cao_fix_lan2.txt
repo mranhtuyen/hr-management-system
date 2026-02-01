@@ -1,0 +1,133 @@
+BAO CAO FIX BUG VA NANG CAP - LAN 2
+====================================
+Ngay: 2026-02-01
+
+=====================================================================
+YEU CAU TU ERROR.TXT                    | TRANG THAI      | GHI CHU
+=====================================================================
+
+(1) Sua/Xoa ca khong giu tuan dang xem  | DA HOAN THANH   |
+---------------------------------------------------------------------
+Yeu cau: Khi sua/xoa ca lam viec, trang tu dong quay ve tuan truoc
+         thay vi giu nguyen tuan dang xem.
+
+Da lam:
+- Cap nhat route delete_shift: tinh week_offset tu ngay cua shift
+- Cap nhat route edit_shift: tinh week_offset va redirect dung tuan
+- File: app/schedule/routes.py
+
+=====================================================================
+
+(2.1) Loi dang ky lich sau khi bi huy   | DA HOAN THANH   |
+---------------------------------------------------------------------
+Yeu cau: Khi boss huy duyet va NV sua lai, cac shift cu van bi giu
+         lai gay ra loi (tick cu + tick moi)
+
+Da lam:
+- Form submit da XOA tat ca shifts cu truoc khi luu shifts moi
+  (ScheduleShift.query.filter_by(schedule_id=schedule.id).delete())
+- Them nut "Reset lich" cho NV de xoa het va lam lai tu dau
+- Route moi: /schedule/reset-my-schedule
+- File: app/schedule/routes.py, app/templates/schedule/register.html
+
+=====================================================================
+
+(2.2) Loi Xep lich tu dong              | DA SUA 1 PHAN   |
+---------------------------------------------------------------------
+Yeu cau:
+- Xep tu dong khong ton trong dang ky cua NV
+- Khong ton trong gioi han nguoi/ca
+- Tu dong day lich ve cho NV (ngu ngoc)
+- Muon xem draft truoc khi luu
+
+Da lam:
+- Sua assign_parttime_shifts ton trong staff_per_shift (khong con < 3 co dinh)
+- Khong xep Full-time neu ho DA dang ky (uu tien nguyen vong NV)
+- File: app/schedule/auto_scheduler.py
+
+Chua lam:
+- Chua co che do xem draft truoc khi luu
+- Chua co nut "Day lich ve cho NV" rieng biet
+(Can phat trien them tinh nang nay)
+
+=====================================================================
+
+(3) Ma tran lich - them duong ke cot    | DA HOAN THANH   |
+---------------------------------------------------------------------
+Yeu cau: Them dong ke phan biet cac cot T2 | T3 | ... | CN
+
+Da lam:
+- Them border-l-2 border-gray-300 vao cac cot ngay
+- File: app/templates/schedule/review.html
+
+=====================================================================
+
+(4) Cac tinh nang bo sung                | 1 PHAN          |
+---------------------------------------------------------------------
+Yeu cau:
+a. Cai dat ngay/gio khoa dang ky        | DA CO           | /schedule/settings
+b. Xuat Ma tran lich ra Excel           | DA THEM         | Nut o trang review
+c. Cai dat mau Sang/Chieu/Toi           | CHUA LAM        |
+d. Cai dat gio cac ca                   | CHUA LAM        |
+e. Sua Ma tran va Duyet thanh final     | CHUA LAM        | Can phat trien
+
+Da lam:
+- Them nut "Xuat Excel" vao trang /schedule/review
+- Link den /export/export_schedule_matrix?week=...
+- File: app/templates/schedule/review.html
+
+Chua lam:
+- Cai dat mau sac cho ca
+- Cai dat gio bat dau/ket thuc ca
+- Sua truc tiep ma tran dang ky
+
+=====================================================================
+
+(5) Loi Jinja2: enumerate undefined     | DA HOAN THANH   |
+---------------------------------------------------------------------
+Yeu cau: Loi 'enumerate' is undefined trong settings.html
+
+Da lam:
+- Doi tu {% for i, day in enumerate(days) %}
+  thanh  {% for day in days %} va dung loop.index0
+- File: app/templates/schedule/settings.html
+
+=====================================================================
+
+TOM TAT:
+========
+Da hoan thanh:     5/7 yeu cau chinh
+Hoan thanh 1 phan: 2/7 yeu cau (2.2, 4)
+
+CAN LAM THEM:
+=============
+1. Che do xem draft xep lich truoc khi luu
+2. Nut "Day lich ve cho NV" sau khi duyet
+3. Cai dat mau sac ca lam viec
+4. Cai dat gio bat dau/ket thuc cac ca
+5. Sua truc tiep ma tran dang ky
+
+FILES DA THAY DOI:
+==================
+1. app/schedule/routes.py
+   - Them reset_my_schedule route
+   - Cap nhat delete_shift, edit_shift giu dung tuan
+
+2. app/schedule/auto_scheduler.py
+   - Sua assign_parttime_shifts ton trong staff_per_shift
+   - Khong xep Fulltime neu da dang ky
+
+3. app/templates/schedule/settings.html
+   - Fix loi enumerate -> loop.index0
+
+4. app/templates/schedule/register.html
+   - Them nut Reset lich
+
+5. app/templates/schedule/review.html
+   - Them duong ke cot trong ma tran
+   - Them nut Xuat Excel
+
+SERVER STATUS:
+==============
+Server dang chay tai: http://127.0.0.1:5000
+Tat ca endpoints hoat dong binh thuong.

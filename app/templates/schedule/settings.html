@@ -24,8 +24,8 @@
                     <div>
                         <label class="block text-sm text-gray-500 mb-1">Ngay</label>
                         <select name="deadline_day" class="w-full px-4 py-2 border rounded-lg">
-                            {% for i, day in enumerate(days) %}
-                            <option value="{{ i }}" {% if settings.deadline_day == i %}selected{% endif %}>
+                            {% for day in days %}
+                            <option value="{{ loop.index0 }}" {% if settings.deadline_day == loop.index0 %}selected{% endif %}>
                                 {{ day }}
                             </option>
                             {% endfor %}

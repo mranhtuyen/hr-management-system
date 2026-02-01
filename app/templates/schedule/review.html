@@ -40,24 +40,30 @@
     <!-- Schedule Matrix -->
     {% if pending_schedules or approved_schedules %}
     <div class="bg-white rounded-lg shadow p-6">
-        <h3 class="text-lg font-semibold mb-4">Ma tran lich dang ky</h3>
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">Ma tran lich dang ky</h3>
+            <a href="{{ url_for('export.export_schedule_matrix', week=week_start.strftime('%Y-%m-%d')) }}"
+               class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm">
+                Xuat Excel
+            </a>
+        </div>
         <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+            <table class="w-full text-sm border-collapse">
                 <thead class="bg-gray-50">
                     <tr>
-                        <th class="px-2 py-2 text-left sticky left-0 bg-gray-50 z-10">Nhan vien</th>
+                        <th class="px-2 py-2 text-left sticky left-0 bg-gray-50 z-10 border-r-2 border-gray-300">Nhan vien</th>
                         {% for i in range(7) %}
                         {% set day = week_start + timedelta(days=i) %}
-                        <th class="px-1 py-2 text-center" colspan="3">
+                        <th class="px-1 py-2 text-center border-l-2 border-gray-300" colspan="3">
                             <div>{{ ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'][i] }}</div>
                             <div class="text-xs text-gray-500">{{ day.strftime('%d/%m') }}</div>
                         </th>
                         {% endfor %}
                     </tr>
                     <tr class="bg-gray-100">
-                        <th class="px-2 py-1 sticky left-0 bg-gray-100 z-10"></th>
+                        <th class="px-2 py-1 sticky left-0 bg-gray-100 z-10 border-r-2 border-gray-300"></th>
                         {% for i in range(7) %}
-                        <th class="px-1 py-1 text-center text-xs text-yellow-600">S</th>
+                        <th class="px-1 py-1 text-center text-xs text-yellow-600 border-l-2 border-gray-300">S</th>
                         <th class="px-1 py-1 text-center text-xs text-orange-600">C</th>
                         <th class="px-1 py-1 text-center text-xs text-indigo-600">T</th>
                         {% endfor %}
@@ -66,7 +72,7 @@
                 <tbody class="divide-y">
                     {% for schedule in pending_schedules + approved_schedules %}
                     <tr class="hover:bg-gray-50">
-                        <td class="px-2 py-2 sticky left-0 bg-white z-10 whitespace-nowrap">
+                        <td class="px-2 py-2 sticky left-0 bg-white z-10 whitespace-nowrap border-r-2 border-gray-300">
                             <span class="{% if schedule.status.value == 'approved' %}text-green-700{% else %}text-blue-700{% endif %}">
                                 {{ schedule.user.full_name }}
                             </span>
@@ -78,7 +84,7 @@
                         {% set day = week_start + timedelta(days=i) %}
                         {% for shift_type in ['morning', 'afternoon', 'evening'] %}
                         {% set has_shift = schedule.shifts | selectattr('date', 'equalto', day) | selectattr('shift_type.value', 'equalto', shift_type) | list | length > 0 %}
-                        <td class="px-1 py-2 text-center">
+                        <td class="px-1 py-2 text-center {% if loop.first %}border-l-2 border-gray-300{% endif %}">
                             {% if has_shift %}
                             <span class="inline-block w-4 h-4 rounded-full
                                 {% if shift_type == 'morning' %}bg-yellow-400

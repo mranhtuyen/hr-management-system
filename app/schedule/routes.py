@@ -172,6 +172,35 @@ def register():
                            timedelta=timedelta)
 
 
+@bp.route('/reset-my-schedule', methods=['POST'])
+@login_required
+def reset_my_schedule():
+    """Cho phep NV reset lich dang ky de lam lai tu dau"""
+    week_start, week_end = get_next_week_dates()
+
+    existing_schedule = WorkSchedule.query.filter_by(
+        user_id=current_user.id,
+        week_start_date=week_start
+    ).first()
+
+    if existing_schedule:
+        # Chi cho phep reset neu chua duoc duyet
+        if existing_schedule.status == ScheduleStatus.APPROVED:
+            flash('Lich da duoc duyet, khong the reset.', 'warning')
+            return redirect(url_for('schedule.register'))
+
+        # Xoa tat ca shifts
+        ScheduleShift.query.filter_by(schedule_id=existing_schedule.id).delete()
+        # Xoa schedule
+        db.session.delete(existing_schedule)
+        db.session.commit()
+        flash('Da reset lich thanh cong. Ban co the dang ky lai tu dau.', 'success')
+    else:
+        flash('Khong co lich de reset.', 'info')
+
+    return redirect(url_for('schedule.register'))
+
+
 @bp.route('/my-schedule')
 @login_required
 def my_schedule():
@@ -539,6 +568,12 @@ def edit_shift(shift_id):
     """Sua 1 ca lam viec (Admin)"""
     shift = ScheduleShift.query.get_or_404(shift_id)
 
+    # Tinh week_offset de quay lai dung tuan
+    today = datetime.now().date()
+    current_week_start = today - timedelta(days=today.weekday())
+    shift_week_start = shift.date - timedelta(days=shift.date.weekday())
+    week_offset = (shift_week_start - current_week_start).days // 7
+
     if request.method == 'POST':
         new_user_id = request.form.get('user_id', type=int)
         if new_user_id:
@@ -564,11 +599,11 @@ def edit_shift(shift_id):
             db.session.commit()
             flash('Da cap nhat ca lam viec.', 'success')
 
-        return redirect(url_for('schedule.view'))
+        return redirect(url_for('schedule.view', week=week_offset))
 
     # Lay danh sach NV de chon
     staff_list = User.query.filter_by(status='active').all()
-    return render_template('schedule/edit_shift.html', shift=shift, staff_list=staff_list)
+    return render_template('schedule/edit_shift.html', shift=shift, staff_list=staff_list, week_offset=week_offset)
 
 
 @bp.route('/delete/<int:shift_id>', methods=['POST'])
@@ -577,10 +612,17 @@ def edit_shift(shift_id):
 def delete_shift(shift_id):
     """Xoa 1 ca lam viec (Admin)"""
     shift = ScheduleShift.query.get_or_404(shift_id)
+
+    # Tinh week_offset de quay lai dung tuan
+    today = datetime.now().date()
+    current_week_start = today - timedelta(days=today.weekday())
+    shift_week_start = shift.date - timedelta(days=shift.date.weekday())
+    week_offset = (shift_week_start - current_week_start).days // 7
+
     db.session.delete(shift)
     db.session.commit()
     flash('Da xoa ca lam viec.', 'success')
-    return redirect(url_for('schedule.view'))
+    return redirect(url_for('schedule.view', week=week_offset))
 
 
 @bp.route('/settings', methods=['GET', 'POST'])

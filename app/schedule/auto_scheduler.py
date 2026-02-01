@@ -68,12 +68,15 @@ def auto_generate_schedule(week_start_date, staff_per_shift=2):
     days_worked = defaultdict(set)
 
     # 6. Xep theo nguyen vong cua NV da dang ky TRUOC
+    # Chi xep vao ca NV da dang ky, TON TRONG nguyen vong
     for schedule in submitted_schedules:
-        assign_parttime_shifts(schedule, week_schedule, shift_count, days_worked)
+        assign_parttime_shifts(schedule, week_schedule, shift_count, days_worked, staff_per_shift)
 
-    # 7. Xep Full-time vao cac ca con trong
+    # 7. Xep Full-time vao cac ca con trong - chi xep neu ho CHUA dang ky
+    registered_user_ids = [s.user_id for s in submitted_schedules]
     for user in fulltime_users:
-        assign_fulltime_shifts(user, week_schedule, week_start_date, shift_count, days_worked, staff_per_shift)
+        if user.id not in registered_user_ids:
+            assign_fulltime_shifts(user, week_schedule, week_start_date, shift_count, days_worked, staff_per_shift)
 
     # 8. Phan bo them NV vao gio dong (neu co du lieu)
     if peak_hours:
@@ -160,11 +163,12 @@ def assign_fulltime_shifts(user, week_schedule, week_start_date, shift_count, da
         assigned_days += 1
 
 
-def assign_parttime_shifts(schedule, week_schedule, shift_count, days_worked):
+def assign_parttime_shifts(schedule, week_schedule, shift_count, days_worked, staff_per_shift=2):
     """
     Xep lich cho nhan vien theo nguyen vong da dang ky
     - Ap dung cho tat ca NV (khong chi part-time)
     - Dua vao lich da dang ky
+    - TON TRONG nguyen vong cua NV: chi xep vao ca ho da dang ky
     """
     user = schedule.user
 
@@ -177,8 +181,8 @@ def assign_parttime_shifts(schedule, week_schedule, shift_count, days_worked):
         if date not in week_schedule:
             continue
 
-        # Kiem tra ca con cho khong (toi da 3 nguoi/ca)
-        if len(week_schedule[date][shift_type]) < 3:
+        # Kiem tra ca con cho khong - ton trong staff_per_shift
+        if len(week_schedule[date][shift_type]) < staff_per_shift:
             # Kiem tra user chua co trong ca nay
             if user not in week_schedule[date][shift_type]:
                 # Kiem tra nguoi nay chua lam qua nhieu ca

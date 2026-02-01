@@ -93,14 +93,27 @@
                 </p>
             </div>
 
-            <div class="mt-6 flex justify-end space-x-4">
-                <a href="{{ url_for('dashboard.index') }}" class="px-4 py-2 border rounded-lg hover:bg-gray-100 transition">
-                    Huy
-                </a>
-                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                    {% if not is_open %}disabled{% endif %}>
-                    Gui dang ky
-                </button>
+            <div class="mt-6 flex justify-between">
+                <div>
+                    {% if existing_schedule and is_open %}
+                    <form action="{{ url_for('schedule.reset_my_schedule') }}" method="POST" class="inline"
+                        onsubmit="return confirm('Ban co chac muon xoa het lich da dang ky va lam lai tu dau?')">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition">
+                            Reset lich
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+                <div class="space-x-4">
+                    <a href="{{ url_for('dashboard.index') }}" class="px-4 py-2 border rounded-lg hover:bg-gray-100 transition">
+                        Huy
+                    </a>
+                    <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                        {% if not is_open %}disabled{% endif %}>
+                        Gui dang ky
+                    </button>
+                </div>
             </div>
         </form>
     </div>
