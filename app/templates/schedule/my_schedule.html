@@ -6,56 +6,84 @@
 <div class="space-y-6">
     <h1 class="text-2xl font-bold text-gray-800">Lich lam viec cua toi</h1>
 
-    <!-- Next Week Status -->
-    <div class="bg-white rounded-lg shadow p-6">
-        <div class="flex justify-between items-center mb-4">
-            <h3 class="text-lg font-semibold">
-                Tuan sau
-                {% if next_week_start and next_week_end %}
-                <span class="text-sm font-normal text-gray-500">
-                    ({{ next_week_start.strftime('%d/%m') }} - {{ next_week_end.strftime('%d/%m') }})
-                </span>
-                {% endif %}
-            </h3>
-            {% if not next_schedule or next_schedule.status.value != 'approved' %}
-            <a href="{{ url_for('schedule.register') }}" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">
-                {% if next_schedule and next_schedule.status.value == 'draft' %}Sua va gui lai
-                {% elif next_schedule and next_schedule.status.value == 'submitted' %}Sua lich
-                {% else %}Dang ky lich{% endif %}
+    <!-- Navigation tuan -->
+    <div class="bg-white rounded-lg shadow p-4">
+        <div class="flex justify-between items-center">
+            <a href="{{ url_for('schedule.my_schedule', week=week_offset-1) }}"
+                class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition">
+                Tuan truoc
             </a>
-            {% endif %}
-        </div>
 
-        {% if next_schedule %}
+            <div class="text-center">
+                <p class="text-lg font-bold">
+                    {{ week_start.strftime('%d/%m') }} - {{ week_end.strftime('%d/%m/%Y') }}
+                </p>
+                <p class="text-sm">
+                    {% if is_current_week %}
+                    <span class="text-green-600 font-semibold">Tuan hien tai</span>
+                    {% elif is_past_week %}
+                    <span class="text-gray-500">Tuan da qua</span>
+                    {% else %}
+                    <span class="text-blue-600 font-semibold">Tuan sap toi</span>
+                    {% endif %}
+                </p>
+            </div>
+
+            <a href="{{ url_for('schedule.my_schedule', week=week_offset+1) }}"
+                class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition">
+                Tuan sau
+            </a>
+        </div>
+    </div>
+
+    <!-- Trang thai lich -->
+    <div class="bg-white rounded-lg shadow p-6">
+        {% if my_schedule %}
         <div class="p-4 rounded-lg mb-4
-            {% if next_schedule.status.value == 'approved' %}bg-green-100 text-green-700
-            {% elif next_schedule.status.value == 'submitted' %}bg-blue-100 text-blue-700
+            {% if my_schedule.status.value == 'approved' %}bg-green-100 text-green-700
+            {% elif my_schedule.status.value == 'submitted' %}bg-blue-100 text-blue-700
             {% else %}bg-yellow-100 text-yellow-700{% endif %}">
-
-            {% if next_schedule.status.value == 'approved' %}
-            <p class="font-medium">Lich da duoc duyet!</p>
-            {% elif next_schedule.status.value == 'submitted' %}
-            <p class="font-medium">Da gui dang ky, dang cho duyet.</p>
-            <p class="text-sm">Gui luc: {{ next_schedule.submitted_at.strftime('%d/%m/%Y %H:%M') if next_schedule.submitted_at else '-' }}</p>
-            {% else %}
-            <p class="font-medium">Lich bi tra lai de sua!</p>
-            <p class="text-sm">Vui long sua va gui lai.</p>
+            <p class="font-medium">
+                Trang thai:
+                {% if my_schedule.status.value == 'approved' %}
+                Da duyet
+                {% elif my_schedule.status.value == 'submitted' %}
+                Da gui - Dang cho duyet
+                {% else %}
+                Nhap - Chua gui
+                {% endif %}
+            </p>
+            {% if my_schedule.submitted_at %}
+            <p class="text-sm mt-1">Gui luc: {{ my_schedule.submitted_at.strftime('%d/%m/%Y %H:%M') }}</p>
             {% endif %}
         </div>
+        {% else %}
+        <div class="p-4 bg-yellow-100 text-yellow-700 rounded-lg mb-4">
+            <p class="font-medium">
+                {% if is_past_week %}
+                Khong co lich cho tuan nay.
+                {% else %}
+                Ban chua dang ky lich cho tuan nay!
+                {% endif %}
+            </p>
+        </div>
+        {% endif %}
 
-        <!-- Bang lich dang ky tuong tu quan ly -->
-        {% if next_shifts %}
-        <h4 class="font-medium mb-3 text-gray-700">Lich cua ban tuan sau:</h4>
+        <!-- Bang lich 7 ngay -->
+        <h3 class="font-semibold mb-3 text-gray-700">Lich cua ban:</h3>
         <div class="overflow-x-auto">
             <table class="w-full text-sm border-collapse">
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-2 py-2 text-left border">Ca</th>
                         {% for i in range(7) %}
-                        {% set day_date = next_week_start + timedelta(days=i) %}
-                        <th class="px-2 py-2 text-center border">
+                        {% set day_date = week_start + timedelta(days=i) %}
+                        <th class="px-2 py-2 text-center border {% if day_date == today %}bg-blue-100{% endif %}">
                             <div>{{ ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'][i] }}</div>
                             <div class="text-xs text-gray-500">{{ day_date.strftime('%d/%m') }}</div>
+                            {% if day_date == today %}
+                            <div class="text-xs text-blue-600 font-semibold">Hom nay</div>
+                            {% endif %}
                         </th>
                         {% endfor %}
                     </tr>
@@ -65,10 +93,10 @@
                     <tr class="bg-yellow-50">
                         <td class="px-2 py-2 font-semibold border text-yellow-700">Sang<br><span class="text-xs font-normal">7h-12h</span></td>
                         {% for i in range(7) %}
-                        {% set day_date = next_week_start + timedelta(days=i) %}
-                        {% set has_shift = next_shifts | selectattr('date', 'equalto', day_date) | selectattr('shift_type.value', 'equalto', 'morning') | list | length > 0 %}
-                        {% set shift_confirmed = next_shifts | selectattr('date', 'equalto', day_date) | selectattr('shift_type.value', 'equalto', 'morning') | selectattr('is_confirmed', 'equalto', true) | list | length > 0 %}
-                        <td class="px-2 py-2 text-center border">
+                        {% set day_date = week_start + timedelta(days=i) %}
+                        {% set has_shift = my_shifts | selectattr('date', 'equalto', day_date) | selectattr('shift_type.value', 'equalto', 'morning') | list | length > 0 %}
+                        {% set shift_confirmed = my_shifts | selectattr('date', 'equalto', day_date) | selectattr('shift_type.value', 'equalto', 'morning') | selectattr('is_confirmed', 'equalto', true) | list | length > 0 %}
+                        <td class="px-2 py-2 text-center border {% if day_date == today %}bg-blue-50{% endif %}">
                             {% if has_shift %}
                             <span class="inline-block w-6 h-6 rounded-full {% if shift_confirmed %}bg-green-500{% else %}bg-yellow-400{% endif %}"
                                 title="{% if shift_confirmed %}Da duyet{% else %}Cho duyet{% endif %}"></span>
@@ -82,10 +110,10 @@
                     <tr class="bg-orange-50">
                         <td class="px-2 py-2 font-semibold border text-orange-700">Chieu<br><span class="text-xs font-normal">12h-18h</span></td>
                         {% for i in range(7) %}
-                        {% set day_date = next_week_start + timedelta(days=i) %}
-                        {% set has_shift = next_shifts | selectattr('date', 'equalto', day_date) | selectattr('shift_type.value', 'equalto', 'afternoon') | list | length > 0 %}
-                        {% set shift_confirmed = next_shifts | selectattr('date', 'equalto', day_date) | selectattr('shift_type.value', 'equalto', 'afternoon') | selectattr('is_confirmed', 'equalto', true) | list | length > 0 %}
-                        <td class="px-2 py-2 text-center border">
+                        {% set day_date = week_start + timedelta(days=i) %}
+                        {% set has_shift = my_shifts | selectattr('date', 'equalto', day_date) | selectattr('shift_type.value', 'equalto', 'afternoon') | list | length > 0 %}
+                        {% set shift_confirmed = my_shifts | selectattr('date', 'equalto', day_date) | selectattr('shift_type.value', 'equalto', 'afternoon') | selectattr('is_confirmed', 'equalto', true) | list | length > 0 %}
+                        <td class="px-2 py-2 text-center border {% if day_date == today %}bg-blue-50{% endif %}">
                             {% if has_shift %}
                             <span class="inline-block w-6 h-6 rounded-full {% if shift_confirmed %}bg-green-500{% else %}bg-orange-400{% endif %}"
                                 title="{% if shift_confirmed %}Da duyet{% else %}Cho duyet{% endif %}"></span>
@@ -99,10 +127,10 @@
                     <tr class="bg-indigo-50">
                         <td class="px-2 py-2 font-semibold border text-indigo-700">Toi<br><span class="text-xs font-normal">18h-22h</span></td>
                         {% for i in range(7) %}
-                        {% set day_date = next_week_start + timedelta(days=i) %}
-                        {% set has_shift = next_shifts | selectattr('date', 'equalto', day_date) | selectattr('shift_type.value', 'equalto', 'evening') | list | length > 0 %}
-                        {% set shift_confirmed = next_shifts | selectattr('date', 'equalto', day_date) | selectattr('shift_type.value', 'equalto', 'evening') | selectattr('is_confirmed', 'equalto', true) | list | length > 0 %}
-                        <td class="px-2 py-2 text-center border">
+                        {% set day_date = week_start + timedelta(days=i) %}
+                        {% set has_shift = my_shifts | selectattr('date', 'equalto', day_date) | selectattr('shift_type.value', 'equalto', 'evening') | list | length > 0 %}
+                        {% set shift_confirmed = my_shifts | selectattr('date', 'equalto', day_date) | selectattr('shift_type.value', 'equalto', 'evening') | selectattr('is_confirmed', 'equalto', true) | list | length > 0 %}
+                        <td class="px-2 py-2 text-center border {% if day_date == today %}bg-blue-50{% endif %}">
                             {% if has_shift %}
                             <span class="inline-block w-6 h-6 rounded-full {% if shift_confirmed %}bg-green-500{% else %}bg-indigo-400{% endif %}"
                                 title="{% if shift_confirmed %}Da duyet{% else %}Cho duyet{% endif %}"></span>
@@ -115,96 +143,32 @@
                 </tbody>
             </table>
         </div>
+
         <div class="mt-3 flex gap-4 text-sm text-gray-600">
             <span><span class="inline-block w-3 h-3 rounded-full bg-green-500 mr-1"></span> Da duyet</span>
             <span><span class="inline-block w-3 h-3 rounded-full bg-yellow-400 mr-1"></span> Dang ky / Cho duyet</span>
         </div>
-        {% endif %}
-        {% else %}
-        <div class="p-4 bg-yellow-100 text-yellow-700 rounded-lg">
-            <p class="font-medium">Ban chua dang ky lich tuan sau!</p>
-            <a href="{{ url_for('schedule.register') }}" class="mt-2 inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                Dang ky ngay
+
+        <!-- Actions -->
+        <div class="mt-6 flex gap-4 flex-wrap">
+            {% if can_edit %}
+            <a href="{{ url_for('schedule.register') }}"
+                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                {% if my_schedule %}Sua lich dang ky{% else %}Dang ky lich{% endif %}
+            </a>
+            {% endif %}
+
+            {% if is_past_week %}
+            <div class="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg">
+                Tuan da qua - Chi xem, khong sua duoc
+            </div>
+            {% endif %}
+
+            <a href="{{ url_for('schedule.my_schedule', week=0) }}"
+                class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition">
+                Ve tuan hien tai
             </a>
         </div>
-        {% endif %}
-    </div>
-
-    <!-- Current Week -->
-    <div class="bg-white rounded-lg shadow p-6">
-        <h3 class="text-lg font-semibold mb-4">Tuan hien tai</h3>
-
-        {% if current_shifts %}
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm border-collapse">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-2 py-2 text-left border">Ca</th>
-                        {% for i in range(7) %}
-                        {% set day_date = today - timedelta(days=today.weekday()) + timedelta(days=i) %}
-                        <th class="px-2 py-2 text-center border {% if day_date == today %}bg-blue-100{% endif %}">
-                            <div>{{ ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'][i] }}</div>
-                            <div class="text-xs text-gray-500">{{ day_date.strftime('%d/%m') }}</div>
-                            {% if day_date == today %}
-                            <div class="text-xs text-blue-600 font-semibold">Hom nay</div>
-                            {% endif %}
-                        </th>
-                        {% endfor %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% set current_week_start = today - timedelta(days=today.weekday()) %}
-                    <!-- Ca Sang -->
-                    <tr class="bg-yellow-50">
-                        <td class="px-2 py-2 font-semibold border text-yellow-700">Sang</td>
-                        {% for i in range(7) %}
-                        {% set day_date = current_week_start + timedelta(days=i) %}
-                        {% set has_shift = current_shifts | selectattr('date', 'equalto', day_date) | selectattr('shift_type.value', 'equalto', 'morning') | list | length > 0 %}
-                        <td class="px-2 py-2 text-center border {% if day_date == today %}bg-blue-50{% endif %}">
-                            {% if has_shift %}
-                            <span class="inline-block w-6 h-6 rounded-full bg-yellow-400"></span>
-                            {% else %}
-                            <span class="text-gray-300">-</span>
-                            {% endif %}
-                        </td>
-                        {% endfor %}
-                    </tr>
-                    <!-- Ca Chieu -->
-                    <tr class="bg-orange-50">
-                        <td class="px-2 py-2 font-semibold border text-orange-700">Chieu</td>
-                        {% for i in range(7) %}
-                        {% set day_date = current_week_start + timedelta(days=i) %}
-                        {% set has_shift = current_shifts | selectattr('date', 'equalto', day_date) | selectattr('shift_type.value', 'equalto', 'afternoon') | list | length > 0 %}
-                        <td class="px-2 py-2 text-center border {% if day_date == today %}bg-blue-50{% endif %}">
-                            {% if has_shift %}
-                            <span class="inline-block w-6 h-6 rounded-full bg-orange-400"></span>
-                            {% else %}
-                            <span class="text-gray-300">-</span>
-                            {% endif %}
-                        </td>
-                        {% endfor %}
-                    </tr>
-                    <!-- Ca Toi -->
-                    <tr class="bg-indigo-50">
-                        <td class="px-2 py-2 font-semibold border text-indigo-700">Toi</td>
-                        {% for i in range(7) %}
-                        {% set day_date = current_week_start + timedelta(days=i) %}
-                        {% set has_shift = current_shifts | selectattr('date', 'equalto', day_date) | selectattr('shift_type.value', 'equalto', 'evening') | list | length > 0 %}
-                        <td class="px-2 py-2 text-center border {% if day_date == today %}bg-blue-50{% endif %}">
-                            {% if has_shift %}
-                            <span class="inline-block w-6 h-6 rounded-full bg-indigo-400"></span>
-                            {% else %}
-                            <span class="text-gray-300">-</span>
-                            {% endif %}
-                        </td>
-                        {% endfor %}
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <p class="text-gray-500">Khong co lich lam viec tuan nay.</p>
-        {% endif %}
     </div>
 </div>
 {% endblock %}

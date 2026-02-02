@@ -1,0 +1,165 @@
+BAO CAO FIX BUG VA NANG CAP - LAN 4
+====================================
+Ngay: 2026-02-02
+
+=====================================================================
+YEU CAU TU ERROR.TXT                    | TRANG THAI      | GHI CHU
+=====================================================================
+
+(1) CRITICAL: Hien thi lich tuan hien tai | DA HOAN THANH   |
+---------------------------------------------------------------------
+Yeu cau: NV dang ky ngay 31/01 cho tuan 02-08/02, nhung ngay 02/02
+         khong thay lich da dang ky (ca module NV va Quan ly)
+
+Da lam:
+- CAP NHAT route my_schedule() voi week_offset parameter
+  + week_offset = 0: Tuan hien tai
+  + week_offset = -1: Tuan truoc
+  + week_offset = 1: Tuan sau
+- CAP NHAT route review() voi week_offset tuong tu
+- THEM bien is_past_week, is_current_week, is_future_week
+- CAP NHAT template my_schedule.html (da lam tu lan 3)
+- CAP NHAT template review.html voi navigation tuan
+  + Nut "Tuan truoc" / "Tuan sau"
+  + Hien thi trang thai tuan (hien tai/da qua/sap toi)
+  + Nut "Ve tuan hien tai" va "Xem tuan sau"
+
+Logic:
+- Tuan DA QUA (week_end < today): Chi xem, khong sua
+- Tuan HIEN TAI (week_start <= today <= week_end): Xem + Sua (neu chua duyet)
+- Tuan SAP TOI (week_start > today): Dang ky moi + Sua
+
+File: app/schedule/routes.py, app/templates/schedule/review.html
+
+=====================================================================
+
+(2) Import Attendance voi Preview        | DA HOAN THANH   |
+---------------------------------------------------------------------
+Yeu cau:
+- File Excel khong co nam -> cho chon nam 2025/2026 truoc khi import
+- File thieu ma NV -> hien preview table de user bo sung
+- Cho phep sua/xoa truoc khi luu vao DB
+
+Da lam:
+- THEM dropdown chon nam (2024, 2025, 2026) vao form import
+- TAO route moi preview_import() - Buoc 2: Xem preview
+- TAO route moi confirm_import() - Buoc 3: Xac nhan va luu
+- TAO route moi cancel_import() - Huy bo preview
+- TAO ham parse_attendance_preview() - Parse file khong luu DB
+- TAO ham parse_row_preview() - Parse row format
+- TAO ham parse_pivot_preview() - Parse pivot format
+- TAO ham save_attendance_from_preview() - Luu sau khi preview
+- TAO template preview_import.html
+  + Bang editable voi cot: Ma NV, Ho ten, Ngay, Gio vao, Gio ra
+  + Datalist goi y ma NV tu danh sach user
+  + Nut Xoa dong, Huy bo, Xac nhan va Luu
+  + Highlight dong loi (khong tim thay NV)
+- CAP NHAT template import.html
+  + Them dropdown chon nam
+  + Huong dan ro rang hon
+
+File: app/attendance/routes.py, app/attendance/import_handler.py,
+      app/templates/attendance/import.html,
+      app/templates/attendance/preview_import.html
+
+=====================================================================
+
+(3) Xem Cham Cong voi filter ngay        | DA HOAN THANH   |
+---------------------------------------------------------------------
+Yeu cau: Cho chon tu ngay -- den ngay khi xem cham cong
+
+Da lam:
+- CAP NHAT route view() ho tro filter:
+  + from_date: Ngay bat dau (default: 7 ngay truoc)
+  + to_date: Ngay ket thuc (default: hom nay)
+  + user_id: Loc theo nhan vien (optional)
+- CAP NHAT template view.html
+  + Form filter voi 3 truong: Tu ngay, Den ngay, Nhan vien
+  + Them cot Ngay vao table (vi hien thi nhieu ngay)
+  + Hien thi range dang xem
+
+File: app/attendance/routes.py, app/templates/attendance/view.html
+
+=====================================================================
+
+TOM TAT:
+========
+Da hoan thanh:     3/3 yeu cau chinh
+Hoan thanh 1 phan: 0/3
+
+WORKFLOW IMPORT MOI:
+====================
+1. Vao /attendance/import
+2. Chon nam du lieu (2024/2025/2026)
+3. Chon dinh dang ngay (tu dong/dd-mm/mm-dd...)
+4. Upload file Excel
+5. He thong parse va hien thi preview
+6. User kiem tra:
+   - Bo sung Ma NV cho cac dong thieu
+   - Xoa dong khong can import
+   - Sua thong tin sai
+7. Bam "Xac nhan va Luu" de luu vao DB
+8. Hoac bam "Huy bo" de quay lai
+
+WORKFLOW XEM CHAM CONG:
+=======================
+1. Vao /attendance/view
+2. Chon khoang ngay (Tu ngay - Den ngay)
+3. Chon nhan vien (optional)
+4. Bam "Tim kiem"
+5. Xem bang cham cong theo ngay
+
+WORKFLOW XEM LICH (NV + QUAN LY):
+=================================
+1. Mac dinh hien thi tuan hien tai (week_offset=0)
+2. Bam "Tuan truoc" de xem week_offset-1
+3. Bam "Tuan sau" de xem week_offset+1
+4. Bam "Ve tuan hien tai" de reset week_offset=0
+5. Tuan da qua: Chi xem, khong sua
+6. Tuan hien tai: Xem + Sua (neu chua duyet)
+7. Tuan sap toi: Dang ky moi + Sua
+
+FILES DA THAY DOI/TAO MOI:
+==========================
+1. app/schedule/routes.py
+   - Cap nhat my_schedule() va review() voi week_offset
+
+2. app/templates/schedule/review.html
+   - Them navigation tuan (truoc/sau/hien tai)
+
+3. app/attendance/routes.py
+   - Them import json, session
+   - Them preview_import(), confirm_import(), cancel_import()
+   - Cap nhat view() voi filter from_date/to_date/user_id
+
+4. app/attendance/import_handler.py
+   - Them parse_attendance_preview()
+   - Them parse_row_preview()
+   - Them parse_pivot_preview()
+   - Them save_attendance_from_preview()
+
+5. app/templates/attendance/import.html
+   - Them dropdown chon nam
+
+6. app/templates/attendance/preview_import.html (MOI)
+   - Template preview voi editable table
+
+7. app/templates/attendance/view.html
+   - Them form filter (from_date, to_date, user_id)
+   - Them cot Ngay vao table
+
+TEST RESULTS:
+=============
+- Flask app loads: OK
+- Routes import: OK
+- attendance.preview_import: OK
+- attendance.confirm_import: OK
+- attendance.cancel_import: OK
+- schedule.review with week_offset: OK
+
+LUU Y:
+======
+- Neu file Excel chi co ngay/thang (VD: 15/01), user PHAI chon nam truoc
+- Preview hien thi tat ca dong, dong loi (khong tim thay NV) co mau do
+- User co the nhap ma NV vao cot Ma NV, he thong se goi y tu datalist
+- Chi can nhap dung ma NV (username), khong can nhap ho ten

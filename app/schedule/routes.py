@@ -204,46 +204,57 @@ def reset_my_schedule():
 @bp.route('/my-schedule')
 @login_required
 def my_schedule():
-    """Xem lich lam viec cua ban than"""
+    """Xem lich lam viec cua ban than - ho tro xem nhieu tuan"""
     today = datetime.now().date()
 
-    # Lich hien tai
+    # Lay week_offset tu params (0 = tuan hien tai, 1 = tuan sau, -1 = tuan truoc)
+    week_offset = request.args.get('week', 0, type=int)
+
+    # Tinh tuan dang xem
     current_week_start = today - timedelta(days=today.weekday())
-    current_schedule = WorkSchedule.query.filter_by(
+    week_start = current_week_start + timedelta(weeks=week_offset)
+    week_end = week_start + timedelta(days=6)
+
+    # Xac dinh loai tuan
+    is_past_week = week_end < today
+    is_current_week = week_start <= today <= week_end
+    is_future_week = week_start > today
+
+    # Lay lich cua tuan dang xem
+    my_schedule_data = WorkSchedule.query.filter_by(
         user_id=current_user.id,
-        week_start_date=current_week_start
+        week_start_date=week_start
     ).first()
 
-    current_shifts = []
-    if current_schedule:
-        # Hien thi tat ca shifts da duoc confirmed
-        current_shifts = ScheduleShift.query.filter_by(
-            schedule_id=current_schedule.id,
-            is_confirmed=True
+    # Lay shifts - hien thi TAT CA shifts (ke ca chua confirmed) de NV thay lich da dang ky
+    my_shifts = []
+    if my_schedule_data:
+        my_shifts = ScheduleShift.query.filter_by(
+            schedule_id=my_schedule_data.id
         ).order_by(ScheduleShift.date).all()
 
-    # Lich tuan sau
-    next_week_start, next_week_end = get_next_week_dates()
-    next_schedule = WorkSchedule.query.filter_by(
-        user_id=current_user.id,
-        week_start_date=next_week_start
-    ).first()
-
-    # Lay shifts tuan sau (ca da dang ky va da duyet)
-    next_shifts = []
-    if next_schedule:
-        next_shifts = ScheduleShift.query.filter_by(
-            schedule_id=next_schedule.id
-        ).order_by(ScheduleShift.date).all()
+    # Kiem tra co the sua lich khong
+    # - Tuan da qua: KHONG SUA DUOC
+    # - Tuan hien tai: SUA DUOC neu chua duyet
+    # - Tuan sap toi: SUA DUOC neu chua duyet
+    can_edit = False
+    if not is_past_week:
+        if my_schedule_data:
+            can_edit = my_schedule_data.status != ScheduleStatus.APPROVED
+        else:
+            can_edit = True  # Chua co lich -> co the dang ky moi
 
     return render_template('schedule/my_schedule.html',
-                           current_schedule=current_schedule,
-                           current_shifts=current_shifts,
-                           next_schedule=next_schedule,
-                           next_shifts=next_shifts,
-                           next_week_start=next_week_start,
-                           next_week_end=next_week_end,
+                           my_schedule=my_schedule_data,
+                           my_shifts=my_shifts,
+                           week_start=week_start,
+                           week_end=week_end,
+                           week_offset=week_offset,
                            today=today,
+                           is_past_week=is_past_week,
+                           is_current_week=is_current_week,
+                           is_future_week=is_future_week,
+                           can_edit=can_edit,
                            timedelta=timedelta)
 
 
@@ -304,8 +315,21 @@ def view():
 @login_required
 @manager_required
 def review():
-    """Duyet lich dang ky cua NV"""
-    week_start, week_end = get_next_week_dates()
+    """Duyet lich dang ky cua NV - ho tro xem nhieu tuan"""
+    today = datetime.now().date()
+
+    # Lay week_offset tu params (0 = tuan hien tai, 1 = tuan sau, -1 = tuan truoc)
+    week_offset = request.args.get('week', 0, type=int)
+
+    # Tinh tuan dang xem
+    current_week_start = today - timedelta(days=today.weekday())
+    week_start = current_week_start + timedelta(weeks=week_offset)
+    week_end = week_start + timedelta(days=6)
+
+    # Xac dinh loai tuan
+    is_past_week = week_end < today
+    is_current_week = week_start <= today <= week_end
+    is_future_week = week_start > today
 
     # Lay cac lich chua duyet
     pending_schedules = WorkSchedule.query.filter(
@@ -330,6 +354,10 @@ def review():
                            not_registered=not_registered,
                            week_start=week_start,
                            week_end=week_end,
+                           week_offset=week_offset,
+                           is_past_week=is_past_week,
+                           is_current_week=is_current_week,
+                           is_future_week=is_future_week,
                            timedelta=timedelta)
 
 

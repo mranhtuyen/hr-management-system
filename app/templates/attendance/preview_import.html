@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Preview Import - HR System{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800">Preview du lieu cham cong</h1>
+        <span class="text-gray-600">Nam: {{ year }}</span>
+    </div>
+
+    <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4">
+        <h3 class="font-semibold text-yellow-800 mb-2">Kiem tra va bo sung thong tin:</h3>
+        <ul class="text-sm text-yellow-700 space-y-1">
+            <li>- Cac dong co mau do la chua tim thay nhan vien trong he thong</li>
+            <li>- Nhap <strong>Ma NV</strong> cho cac dong thieu (chon tu danh sach goi y)</li>
+            <li>- Nhan nut "Xoa" de loai bo dong khong can import</li>
+            <li>- Sau khi kiem tra xong, nhan "Xac nhan va Luu"</li>
+        </ul>
+    </div>
+
+    <form method="POST" action="{{ url_for('attendance.confirm_import') }}" id="confirmForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="records_json" id="records_json">
+
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm" id="previewTable">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="px-3 py-2 text-left">STT</th>
+                            <th class="px-3 py-2 text-left">Ma NV</th>
+                            <th class="px-3 py-2 text-left">Ho ten</th>
+                            <th class="px-3 py-2 text-left">Ngay</th>
+                            <th class="px-3 py-2 text-left">Gio vao</th>
+                            <th class="px-3 py-2 text-left">Gio ra</th>
+                            <th class="px-3 py-2 text-left">Trang thai</th>
+                            <th class="px-3 py-2 text-center">Thao tac</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y">
+                        {% for record in records %}
+                        <tr class="{% if record.error %}bg-red-50{% else %}bg-green-50{% endif %} hover:bg-gray-100" data-index="{{ loop.index0 }}">
+                            <td class="px-3 py-2">{{ loop.index }}</td>
+                            <td class="px-3 py-2">
+                                <input type="text" class="employee-code border rounded px-2 py-1 w-24 text-sm"
+                                    list="userList"
+                                    value="{{ record.employee_code or '' }}"
+                                    placeholder="Nhap ma NV">
+                            </td>
+                            <td class="px-3 py-2">
+                                <input type="text" class="full-name border rounded px-2 py-1 w-40 text-sm"
+                                    value="{{ record.full_name or '' }}">
+                            </td>
+                            <td class="px-3 py-2">
+                                <input type="text" class="date border rounded px-2 py-1 w-24 text-sm"
+                                    value="{{ record.date or '' }}">
+                            </td>
+                            <td class="px-3 py-2">
+                                <input type="text" class="checkin border rounded px-2 py-1 w-16 text-sm"
+                                    value="{{ record.checkin or '' }}">
+                            </td>
+                            <td class="px-3 py-2">
+                                <input type="text" class="checkout border rounded px-2 py-1 w-16 text-sm"
+                                    value="{{ record.checkout or '' }}">
+                            </td>
+                            <td class="px-3 py-2">
+                                {% if record.error %}
+                                <span class="text-red-600 text-xs">{{ record.error }}</span>
+                                {% elif record.matched_user_name %}
+                                <span class="text-green-600 text-xs">OK: {{ record.matched_user_name }}</span>
+                                {% else %}
+                                <span class="text-gray-500 text-xs">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-3 py-2 text-center">
+                                <button type="button" onclick="removeRow(this)"
+                                    class="text-red-600 hover:text-red-800 text-sm">
+                                    Xoa
+                                </button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="px-4 py-8 text-center text-gray-500">
+                                Khong co du lieu de preview.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="mt-4 flex justify-between items-center">
+            <div class="text-sm text-gray-600">
+                Tong: <span id="totalCount">{{ records|length }}</span> ban ghi
+            </div>
+            <div class="flex gap-4">
+                <form action="{{ url_for('attendance.cancel_import') }}" method="POST" class="inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition">
+                        Huy bo
+                    </button>
+                </form>
+                <button type="submit" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+                    Xac nhan va Luu
+                </button>
+            </div>
+        </div>
+    </form>
+
+    <!-- Datalist goi y ma NV -->
+    <datalist id="userList">
+        {% for user in all_users %}
+        <option value="{{ user.username }}">{{ user.full_name }}</option>
+        {% endfor %}
+    </datalist>
+</div>
+
+<script>
+function removeRow(btn) {
+    const row = btn.closest('tr');
+    row.remove();
+    updateTotalCount();
+}
+
+function updateTotalCount() {
+    const count = document.querySelectorAll('#previewTable tbody tr').length;
+    document.getElementById('totalCount').textContent = count;
+}
+
+document.getElementById('confirmForm').onsubmit = function(e) {
+    e.preventDefault();
+
+    // Thu thap du lieu tu table
+    const rows = document.querySelectorAll('#previewTable tbody tr');
+    const records = [];
+
+    rows.forEach((row, index) => {
+        const employeeCode = row.querySelector('.employee-code');
+        const fullName = row.querySelector('.full-name');
+        const date = row.querySelector('.date');
+        const checkin = row.querySelector('.checkin');
+        const checkout = row.querySelector('.checkout');
+
+        if (employeeCode && fullName && date) {
+            records.push({
+                employee_code: employeeCode.value.trim(),
+                full_name: fullName.value.trim(),
+                date: date.value.trim(),
+                checkin: checkin ? checkin.value.trim() : '',
+                checkout: checkout ? checkout.value.trim() : ''
+            });
+        }
+    });
+
+    if (records.length === 0) {
+        alert('Khong co du lieu de luu!');
+        return false;
+    }
+
+    // Luu vao hidden field
+    document.getElementById('records_json').value = JSON.stringify(records);
+
+    // Submit form
+    this.submit();
+};
+</script>
+{% endblock %}

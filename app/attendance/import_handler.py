@@ -699,3 +699,336 @@ def import_row_format_openpyxl(ws, date_format='auto'):
         'errors': errors,
         'records': records
     }
+
+
+# =============================================================================
+# PREVIEW IMPORT FUNCTIONS
+# =============================================================================
+
+def parse_attendance_preview(file_path, year, date_format='auto'):
+    """
+    Parse file Excel de preview - khong luu vao DB
+
+    Args:
+        file_path: Duong dan file Excel
+        year: Nam de ghi date (file co the chi co dd/mm)
+        date_format: Dinh dang ngay
+
+    Returns:
+        List[dict]: Danh sach records de preview
+    """
+    ws, is_openpyxl, error = load_excel_file(file_path)
+    if error:
+        return []
+
+    records = []
+    max_rows, max_cols = get_sheet_dimensions(ws, is_openpyxl)
+
+    # Detect format
+    file_format = detect_format(ws, is_openpyxl)
+
+    if file_format == 'pivot':
+        # Parse pivot format
+        records = parse_pivot_preview(ws, is_openpyxl, year, date_format)
+    else:
+        # Parse row format
+        records = parse_row_preview(ws, is_openpyxl, year, date_format)
+
+    return records
+
+
+def parse_row_preview(ws, is_openpyxl, year, date_format='auto'):
+    """Parse file Excel row format de preview"""
+    records = []
+    max_rows, max_cols = get_sheet_dimensions(ws, is_openpyxl)
+
+    # Tim dong header
+    header_row = 0
+    for row in range(min(5, max_rows)):
+        val = get_cell_value(ws, row, 0, is_openpyxl)
+        if val:
+            val_str = str(val).lower().strip()
+            if val_str in ['ma nv', 'ma', 'code', 'manv', 'stt', 'mã nv', 'mã']:
+                header_row = row
+                break
+
+    # Parse data rows
+    for row in range(header_row + 1, max_rows):
+        try:
+            # Lay gia tri cac cot
+            col0 = get_cell_value(ws, row, 0, is_openpyxl)
+            col1 = get_cell_value(ws, row, 1, is_openpyxl)
+            col2 = get_cell_value(ws, row, 2, is_openpyxl)
+            col3 = get_cell_value(ws, row, 3, is_openpyxl)
+            col4 = get_cell_value(ws, row, 4, is_openpyxl)
+
+            # Neu tat ca empty -> skip
+            if not any([col0, col1, col2, col3]):
+                continue
+
+            # Xac dinh cot nao la gi
+            # Truong hop 1: Ma NV, Ho ten, Ngay, Gio vao, Gio ra
+            # Truong hop 2: STT, Ho ten, Ngay, Gio vao, Gio ra (khong co ma NV)
+            employee_code = None
+            full_name = None
+            date_val = None
+            checkin = None
+            checkout = None
+
+            # Thu tim ho ten (cot co chu cai)
+            for i, val in enumerate([col0, col1, col2, col3, col4]):
+                if val and isinstance(val, str) and len(val) > 2 and not parse_date(val, date_format, year) and not parse_time(val):
+                    if i == 0:
+                        # Cot 0 la STT hoac Ma NV
+                        try:
+                            int(str(col0))
+                            # La so -> STT, ho ten o cot 1
+                            full_name = str(col1).strip() if col1 else None
+                            date_val = col2
+                            checkin = col3
+                            checkout = col4
+                        except:
+                            # La ma NV
+                            employee_code = str(col0).strip()
+                            full_name = str(col1).strip() if col1 else None
+                            date_val = col2
+                            checkin = col3
+                            checkout = col4
+                    elif i == 1:
+                        full_name = str(val).strip()
+                        # Cot 0 la ma NV hoac STT
+                        try:
+                            int(str(col0))
+                            # La STT, khong co ma NV
+                            pass
+                        except:
+                            employee_code = str(col0).strip()
+                        date_val = col2
+                        checkin = col3
+                        checkout = col4
+                    break
+
+            if not full_name:
+                continue
+
+            # Parse date
+            parsed_date = parse_date(date_val, date_format, year)
+            if not parsed_date:
+                continue
+
+            # Parse time
+            checkin_time = parse_time(checkin)
+            checkout_time = parse_time(checkout)
+
+            # Thu tim user tu employee_code hoac full_name
+            matched_user = None
+            if employee_code:
+                matched_user = User.query.filter_by(username=employee_code).first()
+
+            if not matched_user and full_name:
+                matched_user = User.query.filter(User.full_name.ilike(f'%{full_name}%')).first()
+
+            records.append({
+                'employee_code': employee_code or (matched_user.username if matched_user else ''),
+                'full_name': full_name,
+                'date': parsed_date.strftime('%d/%m/%Y'),
+                'checkin': checkin_time.strftime('%H:%M') if checkin_time else '',
+                'checkout': checkout_time.strftime('%H:%M') if checkout_time else '',
+                'matched_user_id': matched_user.id if matched_user else None,
+                'matched_user_name': matched_user.full_name if matched_user else None,
+                'error': None if matched_user else 'Khong tim thay NV'
+            })
+
+        except Exception as e:
+            continue
+
+    return records
+
+
+def parse_pivot_preview(ws, is_openpyxl, year, date_format='auto'):
+    """Parse file Excel pivot format de preview"""
+    records = []
+    max_rows, max_cols = get_sheet_dimensions(ws, is_openpyxl)
+
+    # Parse headers (dates)
+    date_columns = {}
+    for col in range(2, max_cols):
+        header = get_cell_value(ws, 0, col, is_openpyxl)
+        if header:
+            parsed_date = parse_pivot_date(header, year)
+            if parsed_date:
+                date_columns[col] = parsed_date
+
+    if not date_columns:
+        return []
+
+    # Parse each row
+    for row in range(1, max_rows):
+        employee_code = get_cell_value(ws, row, 0, is_openpyxl)
+        full_name = get_cell_value(ws, row, 1, is_openpyxl)
+
+        if not employee_code and not full_name:
+            continue
+
+        employee_code = str(employee_code).strip() if employee_code else ''
+        full_name = str(full_name).strip() if full_name else ''
+
+        # Tim user
+        matched_user = None
+        if employee_code:
+            matched_user = User.query.filter_by(username=employee_code).first()
+        if not matched_user and full_name:
+            matched_user = User.query.filter(User.full_name.ilike(f'%{full_name}%')).first()
+
+        # Parse each date column
+        for col, date in date_columns.items():
+            cell_value = get_cell_value(ws, row, col, is_openpyxl)
+            if not cell_value:
+                continue
+
+            checkin_time, checkout_time = parse_checkin_checkout(cell_value)
+            if not checkin_time:
+                continue
+
+            records.append({
+                'employee_code': employee_code or (matched_user.username if matched_user else ''),
+                'full_name': full_name or (matched_user.full_name if matched_user else ''),
+                'date': date.strftime('%d/%m/%Y'),
+                'checkin': checkin_time.strftime('%H:%M') if checkin_time else '',
+                'checkout': checkout_time.strftime('%H:%M') if checkout_time else '',
+                'matched_user_id': matched_user.id if matched_user else None,
+                'matched_user_name': matched_user.full_name if matched_user else None,
+                'error': None if matched_user else 'Khong tim thay NV'
+            })
+
+    return records
+
+
+def save_attendance_from_preview(records):
+    """
+    Luu records tu preview vao database
+
+    Args:
+        records: List[dict] tu form preview
+
+    Returns:
+        dict: {'success': int, 'errors': list}
+    """
+    success_count = 0
+    errors = []
+
+    for idx, record in enumerate(records):
+        try:
+            employee_code = record.get('employee_code', '').strip()
+            full_name = record.get('full_name', '').strip()
+            date_str = record.get('date', '')
+            checkin_str = record.get('checkin', '')
+            checkout_str = record.get('checkout', '')
+
+            if not date_str:
+                errors.append(f'Dong {idx+1}: Thieu ngay')
+                continue
+
+            # Tim user
+            user = None
+            if employee_code:
+                user = User.query.filter_by(username=employee_code).first()
+
+            if not user and full_name:
+                user = User.query.filter(User.full_name.ilike(f'%{full_name}%')).first()
+
+            if not user:
+                errors.append(f'Dong {idx+1}: Khong tim thay NV "{employee_code or full_name}"')
+                continue
+
+            # Parse date
+            try:
+                parsed_date = datetime.strptime(date_str, '%d/%m/%Y').date()
+            except:
+                errors.append(f'Dong {idx+1}: Ngay khong hop le "{date_str}"')
+                continue
+
+            # Parse time
+            checkin_time = None
+            checkout_time = None
+            if checkin_str:
+                checkin_time = parse_time(checkin_str)
+            if checkout_str:
+                checkout_time = parse_time(checkout_str)
+
+            # Tim ca lam viec
+            scheduled_shift = find_scheduled_shift(user.id, parsed_date, checkin_time)
+
+            # Neu khong co lich, suy doan shift type
+            if not scheduled_shift:
+                if checkin_time:
+                    if checkin_time.hour < 12:
+                        shift_type = ShiftType.MORNING
+                        scheduled_start = time(7, 0)
+                        scheduled_end = time(12, 0)
+                    elif checkin_time.hour < 18:
+                        shift_type = ShiftType.AFTERNOON
+                        scheduled_start = time(12, 0)
+                        scheduled_end = time(18, 0)
+                    else:
+                        shift_type = ShiftType.EVENING
+                        scheduled_start = time(18, 0)
+                        scheduled_end = time(22, 0)
+                else:
+                    shift_type = ShiftType.MORNING
+                    scheduled_start = time(7, 0)
+                    scheduled_end = time(12, 0)
+            else:
+                shift_type = scheduled_shift.shift_type
+                scheduled_start = scheduled_shift.shift_start_time
+                scheduled_end = scheduled_shift.shift_end_time
+
+            # Kiem tra da ton tai chua
+            existing = AttendanceRecord.query.filter_by(
+                user_id=user.id,
+                date=parsed_date,
+                shift_type=shift_type
+            ).first()
+
+            if existing:
+                # Cap nhat ban ghi cu
+                existing.actual_checkin = checkin_time
+                existing.actual_checkout = checkout_time
+                existing.late_minutes = calculate_late_minutes(scheduled_start, checkin_time)
+                existing.total_work_hours = round(calculate_work_hours(
+                    scheduled_start, scheduled_end, checkin_time, existing.late_minutes
+                ), 2)
+                existing.is_late = existing.late_minutes > 0
+                existing.is_early_bird = checkin_time and checkin_time < time(6, 55)
+            else:
+                # Tao ban ghi moi
+                late_minutes = calculate_late_minutes(scheduled_start, checkin_time)
+                work_hours = calculate_work_hours(scheduled_start, scheduled_end, checkin_time, late_minutes)
+
+                attendance = AttendanceRecord(
+                    user_id=user.id,
+                    date=parsed_date,
+                    shift_type=shift_type,
+                    scheduled_start=scheduled_start,
+                    scheduled_end=scheduled_end,
+                    actual_checkin=checkin_time,
+                    actual_checkout=checkout_time,
+                    late_minutes=late_minutes,
+                    total_work_hours=round(work_hours, 2),
+                    is_late=late_minutes > 0,
+                    is_early_bird=checkin_time and checkin_time < time(6, 55)
+                )
+                db.session.add(attendance)
+
+            success_count += 1
+
+        except Exception as e:
+            errors.append(f'Dong {idx+1}: Loi - {str(e)}')
+
+    if success_count > 0:
+        db.session.commit()
+
+    return {
+        'success': success_count,
+        'errors': errors
+    }
