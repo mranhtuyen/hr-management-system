@@ -77,6 +77,7 @@
                         <th class="px-4 py-3 text-left">Muon</th>
                         <th class="px-4 py-3 text-left">Gio lam</th>
                         <th class="px-4 py-3 text-left">Trang thai</th>
+                        <th class="px-4 py-3 text-left">Thao tac</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y">
@@ -119,10 +120,21 @@
                             <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-sm">Dung gio</span>
                             {% endif %}
                         </td>
+                        <td class="px-4 py-3">
+                            <div class="flex gap-2">
+                                <button type="button" onclick="openEditModal({{ record.id }}, '{{ record.actual_checkin.strftime('%H:%M') if record.actual_checkin else '' }}', '{{ record.actual_checkout.strftime('%H:%M') if record.actual_checkout else '' }}')"
+                                    class="text-blue-600 hover:underline text-sm">Sua</button>
+                                <form action="{{ url_for('attendance.delete_record', record_id=record.id) }}" method="POST" class="inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="text-red-600 hover:underline text-sm"
+                                        onclick="return confirm('Xoa ban ghi nay?')">Xoa</button>
+                                </form>
+                            </div>
+                        </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="8" class="px-4 py-8 text-center text-gray-500">
+                        <td colspan="9" class="px-4 py-8 text-center text-gray-500">
                             Khong co du lieu cham cong trong khoang thoi gian nay.
                         </td>
                     </tr>
@@ -145,4 +157,56 @@
         </form>
     </div>
 </div>
+
+<!-- Edit Modal -->
+<div id="editModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl p-6 w-96">
+        <h3 class="text-lg font-bold mb-4">Sua ban ghi cham cong</h3>
+        <form id="editForm" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Gio vao</label>
+                    <input type="time" name="actual_checkin" id="edit_checkin"
+                        class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Gio ra</label>
+                    <input type="time" name="actual_checkout" id="edit_checkout"
+                        class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+            <div class="mt-6 flex gap-3">
+                <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Luu
+                </button>
+                <button type="button" onclick="closeEditModal()" class="flex-1 px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400">
+                    Huy
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openEditModal(recordId, checkin, checkout) {
+    document.getElementById('editForm').action = '/attendance/update/' + recordId;
+    document.getElementById('edit_checkin').value = checkin;
+    document.getElementById('edit_checkout').value = checkout;
+    document.getElementById('editModal').classList.remove('hidden');
+    document.getElementById('editModal').classList.add('flex');
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').classList.add('hidden');
+    document.getElementById('editModal').classList.remove('flex');
+}
+
+// Close modal when clicking outside
+document.getElementById('editModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeEditModal();
+    }
+});
+</script>
 {% endblock %}

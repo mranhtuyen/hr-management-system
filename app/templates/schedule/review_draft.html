@@ -157,13 +157,16 @@ function removeDraft(shiftId) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
         },
         body: JSON.stringify({
-            shift_id: shiftId,
-            csrf_token: '{{ csrf_token() }}'
+            shift_id: shiftId
         })
     })
-    .then(r => r.json())
+    .then(r => {
+        if (!r.ok) throw new Error('Server error');
+        return r.json();
+    })
     .then(data => {
         if (data.success) {
             location.reload();
@@ -171,7 +174,10 @@ function removeDraft(shiftId) {
             alert('Loi: ' + (data.error || 'Khong the xoa'));
         }
     })
-    .catch(e => alert('Loi ket noi!'));
+    .catch(e => {
+        console.error(e);
+        alert('Loi: ' + e.message);
+    });
 }
 
 function openAddModal(date, shiftType) {
@@ -193,18 +199,21 @@ document.getElementById('addForm').addEventListener('submit', function(e) {
     const data = {
         user_id: formData.get('user_id'),
         date: formData.get('date'),
-        shift_type: formData.get('shift_type'),
-        csrf_token: '{{ csrf_token() }}'
+        shift_type: formData.get('shift_type')
     };
 
     fetch('{{ url_for("schedule.add_draft_shift") }}', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
         },
         body: JSON.stringify(data)
     })
-    .then(r => r.json())
+    .then(r => {
+        if (!r.ok) throw new Error('Server error');
+        return r.json();
+    })
     .then(data => {
         if (data.success) {
             location.reload();
@@ -212,7 +221,10 @@ document.getElementById('addForm').addEventListener('submit', function(e) {
             alert('Loi: ' + (data.error || 'Khong the them'));
         }
     })
-    .catch(e => alert('Loi ket noi!'));
+    .catch(e => {
+        console.error(e);
+        alert('Loi: ' + e.message);
+    });
 });
 
 // Click ngoai modal de dong

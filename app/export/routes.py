@@ -93,10 +93,21 @@ def export_schedule_matrix():
         if schedule:
             for day_idx in range(7):
                 current_date = week_start + timedelta(days=day_idx)
-                day_shifts = [s for s in schedule.shifts if s.date == current_date]
+                # Chi lay shifts da confirmed de tranh duplicate
+                # Uu tien system shifts (da duyet), neu khong co thi lay employee shifts
+                day_shifts = [s for s in schedule.shifts
+                             if s.date == current_date and s.is_confirmed]
 
-                if day_shifts:
-                    shift_str = ', '.join([s.shift_type.value[0].upper() for s in day_shifts])
+                # Loai bo duplicate: moi shift_type chi lay 1 lan
+                seen_types = set()
+                unique_shifts = []
+                for s in day_shifts:
+                    if s.shift_type not in seen_types:
+                        seen_types.add(s.shift_type)
+                        unique_shifts.append(s)
+
+                if unique_shifts:
+                    shift_str = ', '.join([s.shift_type.value[0].upper() for s in unique_shifts])
                     ws.cell(row=row, column=4 + day_idx, value=shift_str)
 
         row += 1

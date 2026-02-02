@@ -99,10 +99,17 @@ def detail(payroll_id):
         Violation.date < month_end
     ).order_by(Violation.date).all()
 
+    # Tinh ngay bat dau va ket thuc thang cho rewards
+    reward_month_start = datetime(payroll.year, payroll.month, 1)
+    if payroll.month == 12:
+        reward_month_end = datetime(payroll.year + 1, 1, 1)
+    else:
+        reward_month_end = datetime(payroll.year, payroll.month + 1, 1)
+
     rewards = Reward.query.filter(
         Reward.user_id == payroll.user_id,
-        Reward.created_at >= datetime(payroll.year, payroll.month, 1),
-        Reward.created_at < datetime(payroll.year, payroll.month + 1, 1) if payroll.month < 12 else datetime(payroll.year + 1, 1, 1)
+        Reward.created_at >= reward_month_start,
+        Reward.created_at < reward_month_end
     ).all()
 
     # Lay chi tiet cham cong hang ngay

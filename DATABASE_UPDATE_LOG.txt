@@ -1,0 +1,201 @@
+=============================================================
+           DATABASE UPDATE LOG - HR MANAGEMENT SYSTEM
+=============================================================
+
+Project: HR Management System (Coffee Shop Chain)
+Database: SQLite (hr_system.db)
+Location: instance/hr_system.db
+
+=============================================================
+                      BACKUP HISTORY
+=============================================================
+
+[2026-02-02 23:29:00] hr_system_backup_20260202_232900.db
+  - Session: Bug fixes and feature updates
+  - Changes: No schema changes, data updates only
+  - Files modified: routes.py (multiple modules), templates
+
+[2026-01-31 19:56:25] hr_system_backup_20260131_195625.db
+  - Initial backup
+
+=============================================================
+                    DATABASE SCHEMA
+=============================================================
+
+Tables:
+--------
+
+1. user
+   - id (INTEGER, PRIMARY KEY)
+   - username (VARCHAR, UNIQUE)
+   - password_hash (VARCHAR)
+   - full_name (VARCHAR)
+   - phone (VARCHAR)
+   - email (VARCHAR)
+   - role (ENUM: STAFF, MANAGER, ADMIN)
+   - employment_type (ENUM: PART_TIME, FULL_TIME)
+   - hourly_rate (FLOAT)
+   - salary_percentage (FLOAT)
+   - meal_support_eligible (BOOLEAN)
+   - is_probation (BOOLEAN)
+   - probation_salary_rate (FLOAT)
+   - is_active (BOOLEAN)
+   - created_at (DATETIME)
+
+2. work_schedule
+   - id (INTEGER, PRIMARY KEY)
+   - user_id (INTEGER, FK -> user.id)
+   - week_start_date (DATE)
+   - week_end_date (DATE)
+   - status (ENUM: DRAFT, SUBMITTED, APPROVED, LOCKED)
+   - submitted_at (DATETIME)
+   - approved_at (DATETIME)
+   - approved_by (INTEGER, FK -> user.id)
+
+3. schedule_shift
+   - id (INTEGER, PRIMARY KEY)
+   - schedule_id (INTEGER, FK -> work_schedule.id)
+   - date (DATE)
+   - shift_type (ENUM: MORNING, AFTERNOON, EVENING)
+   - shift_start_time (TIME)
+   - shift_end_time (TIME)
+   - is_preferred (BOOLEAN)
+   - is_confirmed (BOOLEAN)
+   - is_and_condition (BOOLEAN)
+   - shift_source (VARCHAR: 'employee', 'system')
+   - draft_status (VARCHAR: 'draft', 'final')
+
+4. attendance_record
+   - id (INTEGER, PRIMARY KEY)
+   - user_id (INTEGER, FK -> user.id)
+   - date (DATE)
+   - shift_type (ENUM)
+   - scheduled_start (TIME)
+   - scheduled_end (TIME)
+   - actual_checkin (TIME)
+   - actual_checkout (TIME)
+   - late_minutes (INTEGER)
+   - early_departure_minutes (INTEGER)
+   - total_work_hours (FLOAT)
+   - is_late (BOOLEAN)
+   - is_early_bird (BOOLEAN)
+
+5. payroll
+   - id (INTEGER, PRIMARY KEY)
+   - user_id (INTEGER, FK -> user.id)
+   - month (INTEGER)
+   - year (INTEGER)
+   - total_work_hours (FLOAT)
+   - total_shifts (INTEGER)
+   - late_count (INTEGER)
+   - total_penalty (FLOAT)
+   - total_reward (FLOAT)
+   - meal_support_amount (FLOAT)
+   - advance_payment (FLOAT)
+   - gross_salary (FLOAT)
+   - net_salary (FLOAT)
+   - status (ENUM: DRAFT, APPROVED, PAID)
+
+6. schedule_settings
+   - id (INTEGER, PRIMARY KEY)
+   - deadline_day (INTEGER, 0-6)
+   - deadline_hour (INTEGER)
+   - deadline_minute (INTEGER)
+   - late_registration_message (TEXT)
+   - allow_current_week_edit (BOOLEAN)
+
+7. system_config
+   - id (INTEGER, PRIMARY KEY)
+   - key (VARCHAR, UNIQUE)
+   - value (TEXT)
+   - Keys used:
+     * shift_morning_color, shift_afternoon_color, shift_evening_color
+     * shift_morning_start, shift_morning_end
+     * shift_afternoon_start, shift_afternoon_end
+     * shift_evening_start, shift_evening_end
+
+8. violation
+   - id (INTEGER, PRIMARY KEY)
+   - user_id (INTEGER, FK -> user.id)
+   - violation_type (VARCHAR)
+   - description (TEXT)
+   - penalty_amount (FLOAT)
+   - created_at (DATETIME)
+
+9. reward
+   - id (INTEGER, PRIMARY KEY)
+   - user_id (INTEGER, FK -> user.id)
+   - reward_type (VARCHAR)
+   - description (TEXT)
+   - amount (FLOAT)
+   - created_at (DATETIME)
+
+10. activity_log
+    - id (INTEGER, PRIMARY KEY)
+    - user_id (INTEGER, FK -> user.id)
+    - action (VARCHAR)
+    - details (TEXT)
+    - created_at (DATETIME)
+
+=============================================================
+                  UPDATE HISTORY (CODE)
+=============================================================
+
+[2026-02-02] Session Updates
+-----------------------------
+
+1. FIXED: SQLAlchemy ArgumentError in payroll detail
+   - File: app/payroll/routes.py
+   - Issue: Ternary datetime expression without parentheses
+   - Solution: Separated datetime calculation into variables
+
+2. FIXED: Dynamic shift settings not applied
+   - File: app/schedule/routes.py
+   - Added: get_shift_settings(), get_dynamic_shift_times()
+   - Now reads shift colors/times from SystemConfig
+
+3. FIXED: Auto-schedule always jumping to next week
+   - File: app/schedule/routes.py
+   - Added: week_offset parameter to select_staff()
+
+4. FIXED: Attendance records missing Edit/Delete
+   - File: app/attendance/routes.py
+   - Added: update_record(), delete_record() routes
+
+5. FIXED: Excel export showing duplicate data
+   - File: app/schedule/routes.py, app/export/routes.py
+   - Solution: Delete old finals before saving, export only confirmed
+
+6. FIXED: AJAX "Connection error" when adding staff to shift
+   - File: app/schedule/routes.py
+   - Issue: dict.get() doesn't have type parameter
+   - Solution: Use request.is_json and int(data.get())
+
+7. FIXED: "Shift already exists" when adding shifts
+   - File: app/schedule/routes.py
+   - Solution: Only check confirmed shifts, not drafts
+
+8. FIXED: Registration deadline not working
+   - File: app/schedule/routes.py
+   - Solution: Allow registration any day before deadline
+
+9. FIXED: Staff cannot register next week
+   - File: app/schedule/routes.py
+   - Solution: Auto-redirect to next week when current is approved
+
+10. ADDED: "My Approved Schedule" menu for staff
+    - File: app/schedule/routes.py, templates
+    - New route: /schedule/my-approved-schedule
+
+=============================================================
+                    NOTES FOR DEVELOPERS
+=============================================================
+
+- Always backup database before making schema changes
+- Use Flask-Migrate for production migrations
+- Test with sample data before deploying
+- Check CLAUDE.md for detailed code patterns and pitfalls
+
+=============================================================
+                      END OF LOG
+=============================================================

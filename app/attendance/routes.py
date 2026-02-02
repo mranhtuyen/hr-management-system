@@ -322,6 +322,95 @@ def report():
                            year=year)
 
 
+@bp.route('/update/<int:record_id>', methods=['POST'])
+@login_required
+@manager_required
+def update_record(record_id):
+    """Cap nhat ban ghi cham cong"""
+    record = AttendanceRecord.query.get_or_404(record_id)
+
+    # Lay du lieu tu form
+    actual_checkin_str = request.form.get('actual_checkin')
+    actual_checkout_str = request.form.get('actual_checkout')
+
+    try:
+        # Parse thoi gian
+        if actual_checkin_str:
+            parts = actual_checkin_str.split(':')
+            from datetime import time as time_type
+            record.actual_checkin = time_type(int(parts[0]), int(parts[1]))
+        else:
+            record.actual_checkin = None
+
+        if actual_checkout_str:
+            parts = actual_checkout_str.split(':')
+            from datetime import time as time_type
+            record.actual_checkout = time_type(int(parts[0]), int(parts[1]))
+        else:
+            record.actual_checkout = None
+
+        # Tinh lai cac truong khac
+        if record.actual_checkin and record.actual_checkout:
+            # Tinh gio lam viec
+            from datetime import datetime as dt_class
+            checkin_dt = dt_class.combine(record.date, record.actual_checkin)
+            checkout_dt = dt_class.combine(record.date, record.actual_checkout)
+            work_duration = (checkout_dt - checkin_dt).total_seconds() / 3600
+            record.total_work_hours = round(max(0, work_duration), 2)
+
+            # Tinh so phut di muon
+            scheduled_start_dt = dt_class.combine(record.date, record.scheduled_start)
+            if checkin_dt > scheduled_start_dt:
+                record.late_minutes = int((checkin_dt - scheduled_start_dt).total_seconds() / 60)
+                record.is_late = record.late_minutes > 0
+            else:
+                record.late_minutes = 0
+                record.is_late = False
+
+            # Check di som (guong mau)
+            from datetime import time as time_type
+            early_bird_time = time_type(6, 55)
+            record.is_early_bird = record.actual_checkin <= early_bird_time
+        else:
+            record.total_work_hours = 0
+            record.late_minutes = 0
+            record.is_late = False
+            record.is_early_bird = False
+
+        db.session.commit()
+        flash('Da cap nhat ban ghi cham cong.', 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Loi khi cap nhat: {str(e)}', 'danger')
+
+    # Quay lai trang view voi filter hien tai
+    return redirect(url_for('attendance.view',
+                            from_date=record.date.strftime('%Y-%m-%d'),
+                            to_date=record.date.strftime('%Y-%m-%d')))
+
+
+@bp.route('/delete/<int:record_id>', methods=['POST'])
+@login_required
+@manager_required
+def delete_record(record_id):
+    """Xoa ban ghi cham cong"""
+    record = AttendanceRecord.query.get_or_404(record_id)
+    record_date = record.date
+
+    try:
+        db.session.delete(record)
+        db.session.commit()
+        flash('Da xoa ban ghi cham cong.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Loi khi xoa: {str(e)}', 'danger')
+
+    return redirect(url_for('attendance.view',
+                            from_date=record_date.strftime('%Y-%m-%d'),
+                            to_date=record_date.strftime('%Y-%m-%d')))
+
+
 @bp.route('/process-late', methods=['GET', 'POST'])
 @login_required
 @manager_required

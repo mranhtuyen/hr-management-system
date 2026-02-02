@@ -6,7 +6,25 @@
 <div class="space-y-6">
     <div class="flex justify-between items-center">
         <h1 class="text-2xl font-bold text-gray-800">Lich lam viec chinh thuc</h1>
-        <span class="text-gray-600">Tuan: {{ week_start.strftime('%d/%m') }} - {{ week_end.strftime('%d/%m/%Y') }}</span>
+    </div>
+
+    <!-- Navigation tuan -->
+    <div class="bg-white rounded-lg shadow p-4">
+        <div class="flex justify-between items-center">
+            <a href="{{ url_for('schedule.final_review', week=week_offset-1 if week_offset is defined else 0) }}"
+                class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition">
+                Tuan truoc
+            </a>
+            <div class="text-center">
+                <p class="text-lg font-bold">
+                    {{ week_start.strftime('%d/%m') }} - {{ week_end.strftime('%d/%m/%Y') }}
+                </p>
+            </div>
+            <a href="{{ url_for('schedule.final_review', week=week_offset+1 if week_offset is defined else 2) }}"
+                class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition">
+                Tuan sau
+            </a>
+        </div>
     </div>
 
     {% if is_published %}

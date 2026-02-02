@@ -152,7 +152,7 @@
         <!-- Actions -->
         <div class="mt-6 flex gap-4 flex-wrap">
             {% if can_edit %}
-            <a href="{{ url_for('schedule.register') }}"
+            <a href="{{ url_for('schedule.register', week=0 if is_current_week else 1) }}"
                 class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
                 {% if my_schedule %}Sua lich dang ky{% else %}Dang ky lich{% endif %}
             </a>
@@ -162,6 +162,15 @@
             <div class="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg">
                 Tuan da qua - Chi xem, khong sua duoc
             </div>
+            {% endif %}
+
+            {% if is_current_week and my_schedule and my_schedule.status.value == 'draft' %}
+            <form action="{{ url_for('schedule.resubmit_current_week') }}" method="POST" class="inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+                    Day lich len Quan ly
+                </button>
+            </form>
             {% endif %}
 
             <a href="{{ url_for('schedule.my_schedule', week=0) }}"

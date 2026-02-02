@@ -371,6 +371,7 @@ class ScheduleSettings(db.Model):
     deadline_hour = db.Column(db.Integer, default=18)  # 18h
     deadline_minute = db.Column(db.Integer, default=0)
     late_registration_message = db.Column(db.Text, default='Ban da dang ky muon, Hay luu y.')
+    allow_current_week_edit = db.Column(db.Boolean, default=True)  # Cho phep sua lich tuan hien tai
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     updated_by = db.Column(db.Integer, db.ForeignKey('users.id'))
 
