@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Lich final - HR System{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800">Lich lam viec chinh thuc</h1>
+        <span class="text-gray-600">Tuan: {{ week_start.strftime('%d/%m') }} - {{ week_end.strftime('%d/%m/%Y') }}</span>
+    </div>
+
+    {% if is_published %}
+    <div class="bg-green-50 border-l-4 border-green-500 p-4">
+        <p class="text-green-700">
+            Lich da duoc <strong>DAY VE CHO NHAN VIEN</strong>.<br>
+            Tong: <strong>{{ total_shifts }}</strong> ca
+        </p>
+    </div>
+    {% else %}
+    <div class="bg-blue-50 border-l-4 border-blue-500 p-4">
+        <p class="text-blue-700">
+            Lich da duoc luu <strong>CHINH THUC</strong>.<br>
+            Tong: <strong>{{ total_shifts }}</strong> ca<br>
+            <em class="text-sm">Bam "Day lich ve cho NV" de nhan vien thay lich nay.</em>
+        </p>
+    </div>
+    {% endif %}
+
+    <!-- Bang lich theo ngay -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold mb-4">Ma tran lich lam viec</h3>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm border-collapse">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-2 py-2 text-left border">Ca</th>
+                        {% for date in schedule_by_date.keys() %}
+                        <th class="px-2 py-2 text-center border">
+                            <div>{{ ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'][loop.index0] }}</div>
+                            <div class="text-xs text-gray-500">{{ date.strftime('%d/%m') }}</div>
+                        </th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Ca Sang -->
+                    <tr class="bg-yellow-50">
+                        <td class="px-2 py-2 font-semibold border text-yellow-700">Sang<br><span class="text-xs font-normal">7h-12h</span></td>
+                        {% for date, shifts_by_type in schedule_by_date.items() %}
+                        <td class="px-2 py-2 border min-w-32">
+                            <div class="space-y-1">
+                                {% for item in shifts_by_type.morning %}
+                                <div class="text-xs bg-yellow-100 p-1 rounded">
+                                    {{ item.user.full_name }}
+                                </div>
+                                {% endfor %}
+                                {% if not shifts_by_type.morning %}
+                                <span class="text-gray-400 text-xs">-</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    <!-- Ca Chieu -->
+                    <tr class="bg-orange-50">
+                        <td class="px-2 py-2 font-semibold border text-orange-700">Chieu<br><span class="text-xs font-normal">12h-18h</span></td>
+                        {% for date, shifts_by_type in schedule_by_date.items() %}
+                        <td class="px-2 py-2 border min-w-32">
+                            <div class="space-y-1">
+                                {% for item in shifts_by_type.afternoon %}
+                                <div class="text-xs bg-orange-100 p-1 rounded">
+                                    {{ item.user.full_name }}
+                                </div>
+                                {% endfor %}
+                                {% if not shifts_by_type.afternoon %}
+                                <span class="text-gray-400 text-xs">-</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    <!-- Ca Toi -->
+                    <tr class="bg-indigo-50">
+                        <td class="px-2 py-2 font-semibold border text-indigo-700">Toi<br><span class="text-xs font-normal">18h-22h</span></td>
+                        {% for date, shifts_by_type in schedule_by_date.items() %}
+                        <td class="px-2 py-2 border min-w-32">
+                            <div class="space-y-1">
+                                {% for item in shifts_by_type.evening %}
+                                <div class="text-xs bg-indigo-100 p-1 rounded">
+                                    {{ item.user.full_name }}
+                                </div>
+                                {% endfor %}
+                                {% if not shifts_by_type.evening %}
+                                <span class="text-gray-400 text-xs">-</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        {% endfor %}
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex gap-4 flex-wrap">
+        {% if not is_published %}
+        <form method="POST" action="{{ url_for('schedule.publish_to_staff') }}" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold"
+                onclick="return confirm('Day lich ve cho nhan vien? Ho se thay lich nay.');">
+                Day lich ve cho NV
+            </button>
+        </form>
+        {% endif %}
+
+        <a href="{{ url_for('schedule.review') }}" class="px-6 py-3 bg-gray-300 rounded-lg hover:bg-gray-400 transition">
+            Quay lai duyet lich
+        </a>
+
+        <a href="{{ url_for('export.export_schedule_matrix', week=week_start.strftime('%Y-%m-%d')) }}"
+            class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+            Xuat Excel
+        </a>
+    </div>
+</div>
+{% endblock %}

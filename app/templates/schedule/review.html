@@ -14,26 +14,23 @@
         </div>
     </div>
 
-    <!-- Auto Generate -->
+    <!-- Auto Generate - Workflow moi -->
     {% if current_user.role.value == 'admin' %}
     <div class="bg-white rounded-lg shadow p-6">
         <h3 class="text-lg font-semibold mb-4">Xep lich tu dong</h3>
         <p class="text-gray-600 mb-4">
-            He thong se tu dong xep lich dua tren nguyen vong cua nhan vien va cac quy tac da dinh.
+            Xep lich tu dong theo workflow moi: Chon NV > Cau hinh > Xem nhap > Luu chinh thuc > Day ve NV
         </p>
-        <form action="{{ url_for('schedule.auto_generate') }}" method="POST" class="flex items-center gap-3">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <label class="text-sm text-gray-600">So NV/ca:</label>
-            <select name="staff_per_shift" class="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
-                <option value="2">2 nguoi/ca</option>
-                <option value="3">3 nguoi/ca</option>
-                <option value="4">4 nguoi/ca</option>
-            </select>
-            <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-                onclick="return confirm('Chay thuat toan xep lich tu dong?')">
-                Xep lich tu dong
-            </button>
-        </form>
+        <div class="flex flex-wrap gap-3">
+            <a href="{{ url_for('schedule.select_staff') }}"
+                class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+                Bat dau xep lich tu dong
+            </a>
+            <a href="{{ url_for('schedule.final_review') }}"
+                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                Xem lich final
+            </a>
+        </div>
     </div>
     {% endif %}
 

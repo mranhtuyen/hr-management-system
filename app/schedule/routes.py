@@ -1,4 +1,4 @@
-from flask import render_template, redirect, url_for, flash, request
+from flask import render_template, redirect, url_for, flash, request, session, jsonify
 from flask_login import login_required, current_user
 from datetime import datetime, timedelta, time
 from app.schedule import bp
@@ -6,7 +6,7 @@ from app.schedule.forms import WeeklyScheduleForm
 from app.schedule.auto_scheduler import auto_generate_schedule
 from app.models import (
     WorkSchedule, ScheduleShift, User, ShiftType, ScheduleStatus,
-    UserRole, EmploymentType, ScheduleSettings, db
+    UserRole, EmploymentType, ScheduleSettings, SystemConfig, db
 )
 from app.auth.routes import manager_required, admin_required
 
@@ -243,7 +243,8 @@ def my_schedule():
                            next_shifts=next_shifts,
                            next_week_start=next_week_start,
                            next_week_end=next_week_end,
-                           today=today)
+                           today=today,
+                           timedelta=timedelta)
 
 
 @bp.route('/view')
@@ -629,7 +630,7 @@ def delete_shift(shift_id):
 @login_required
 @admin_required
 def settings():
-    """Cai dat thoi gian dang ky lich"""
+    """Cai dat thoi gian dang ky lich va mau sac/gio ca"""
     schedule_settings = ScheduleSettings.get_settings()
 
     if request.method == 'POST':
@@ -639,11 +640,418 @@ def settings():
         schedule_settings.late_registration_message = request.form.get('late_message', 'Ban da dang ky muon, Hay luu y.')
         schedule_settings.updated_by = current_user.id
 
+        # Luu cai dat mau sac va gio ca
+        shift_configs = [
+            ('shift_morning_color', request.form.get('morning_color', '#FEF3C7')),
+            ('shift_afternoon_color', request.form.get('afternoon_color', '#FED7AA')),
+            ('shift_evening_color', request.form.get('evening_color', '#C7D2FE')),
+            ('shift_morning_start', request.form.get('morning_start', '07:00')),
+            ('shift_morning_end', request.form.get('morning_end', '12:00')),
+            ('shift_afternoon_start', request.form.get('afternoon_start', '12:00')),
+            ('shift_afternoon_end', request.form.get('afternoon_end', '18:00')),
+            ('shift_evening_start', request.form.get('evening_start', '18:00')),
+            ('shift_evening_end', request.form.get('evening_end', '22:00')),
+        ]
+
+        for key, value in shift_configs:
+            config = SystemConfig.query.filter_by(key=key).first()
+            if config:
+                config.value = value
+            else:
+                config = SystemConfig(key=key, value=value)
+                db.session.add(config)
+
         db.session.commit()
         flash('Da cap nhat cai dat thanh cong!', 'success')
         return redirect(url_for('schedule.settings'))
 
+    # Load cai dat mau sac va gio ca hien tai
+    shift_settings = {}
+    for config in SystemConfig.query.filter(SystemConfig.key.like('shift_%')).all():
+        shift_settings[config.key] = config.value
+
     days = ['Thu 2', 'Thu 3', 'Thu 4', 'Thu 5', 'Thu 6', 'Thu 7', 'Chu nhat']
     return render_template('schedule/settings.html',
                            settings=schedule_settings,
+                           shift_settings=shift_settings,
                            days=days)
+
+
+# =============================================================================
+# WORKFLOW MOI: XEP LICH TU DONG VOI DRAFT
+# =============================================================================
+
+@bp.route('/select-staff', methods=['GET', 'POST'])
+@login_required
+@manager_required
+def select_staff():
+    """Buoc 1: Chon nhan vien tham gia xep lich tu dong"""
+    week_start, week_end = get_next_week_dates()
+
+    if request.method == 'POST':
+        selected_ids = request.form.getlist('staff_ids')
+        session['selected_staff_ids'] = [int(id) for id in selected_ids]
+        session['auto_week_start'] = week_start.isoformat()
+
+        if not selected_ids:
+            flash('Vui long chon it nhat 1 nhan vien!', 'warning')
+            return redirect(url_for('schedule.select_staff'))
+
+        flash(f'Da chon {len(selected_ids)} nhan vien.', 'success')
+        return redirect(url_for('schedule.config_auto_schedule'))
+
+    # Lay danh sach NV da dang ky
+    schedules = WorkSchedule.query.filter(
+        WorkSchedule.week_start_date == week_start,
+        WorkSchedule.status.in_([ScheduleStatus.SUBMITTED, ScheduleStatus.APPROVED])
+    ).order_by(WorkSchedule.submitted_at).all()
+
+    return render_template('schedule/select_staff.html',
+                           schedules=schedules,
+                           week_start=week_start,
+                           week_end=week_end)
+
+
+@bp.route('/config-auto-schedule', methods=['GET', 'POST'])
+@login_required
+@manager_required
+def config_auto_schedule():
+    """Buoc 2: Cau hinh va chay xep lich tu dong"""
+    selected_ids = session.get('selected_staff_ids', [])
+    week_start_str = session.get('auto_week_start')
+
+    if not selected_ids or not week_start_str:
+        flash('Vui long chon nhan vien truoc!', 'warning')
+        return redirect(url_for('schedule.select_staff'))
+
+    week_start = datetime.fromisoformat(week_start_str).date()
+    week_end = week_start + timedelta(days=6)
+
+    if request.method == 'POST':
+        staff_per_shift = request.form.get('staff_per_shift', '2')
+
+        # Chay auto-scheduler voi config moi
+        try:
+            result = auto_generate_schedule(
+                week_start,
+                staff_per_shift=int(staff_per_shift) if staff_per_shift.isdigit() else 2,
+                selected_staff_ids=selected_ids,
+                create_draft=True  # TAO LICH NHAP, KHONG GHI DE
+            )
+
+            if result and result.get('success'):
+                flash(f'Da tao lich NHAP thanh cong! Tong: {result.get("total_shifts", 0)} ca', 'success')
+                return redirect(url_for('schedule.review_draft'))
+            else:
+                flash('Loi khi xep lich!', 'danger')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Loi: {str(e)}', 'danger')
+
+        return redirect(url_for('schedule.review'))
+
+    return render_template('schedule/config_auto.html',
+                           selected_count=len(selected_ids),
+                           week_start=week_start,
+                           week_end=week_end)
+
+
+@bp.route('/review-draft')
+@login_required
+@manager_required
+def review_draft():
+    """Buoc 3: Xem va sua lich nhap"""
+    week_start_str = session.get('auto_week_start')
+
+    if not week_start_str:
+        flash('Khong tim thay lich nhap!', 'warning')
+        return redirect(url_for('schedule.review'))
+
+    week_start = datetime.fromisoformat(week_start_str).date()
+    week_end = week_start + timedelta(days=6)
+
+    # Lay tat ca shifts NHAP (draft)
+    draft_shifts = db.session.query(ScheduleShift, User)\
+        .select_from(ScheduleShift)\
+        .join(WorkSchedule, ScheduleShift.schedule_id == WorkSchedule.id)\
+        .join(User, WorkSchedule.user_id == User.id)\
+        .filter(
+            ScheduleShift.date >= week_start,
+            ScheduleShift.date <= week_end,
+            ScheduleShift.shift_source == 'system',
+            ScheduleShift.draft_status == 'draft'
+        )\
+        .order_by(ScheduleShift.date, ScheduleShift.shift_type)\
+        .all()
+
+    # To chuc theo ngay va ca
+    schedule_by_date = {}
+    for i in range(7):
+        date = week_start + timedelta(days=i)
+        schedule_by_date[date] = {
+            'morning': [],
+            'afternoon': [],
+            'evening': []
+        }
+
+    for shift, user in draft_shifts:
+        shift_type = shift.shift_type.value
+        if shift.date in schedule_by_date:
+            schedule_by_date[shift.date][shift_type].append({
+                'shift': shift,
+                'user': user
+            })
+
+    # Lay danh sach NV de them vao draft
+    all_staff = User.query.filter_by(status='active').filter(User.role != UserRole.ADMIN).all()
+
+    return render_template('schedule/review_draft.html',
+                           schedule_by_date=schedule_by_date,
+                           week_start=week_start,
+                           week_end=week_end,
+                           total_shifts=len(draft_shifts),
+                           all_staff=all_staff,
+                           timedelta=timedelta)
+
+
+@bp.route('/save-draft', methods=['POST'])
+@login_required
+@manager_required
+def save_draft():
+    """Buoc 4: Luu lich nhap thanh chinh thuc"""
+    week_start_str = session.get('auto_week_start')
+
+    if not week_start_str:
+        flash('Khong tim thay lich nhap!', 'warning')
+        return redirect(url_for('schedule.review'))
+
+    week_start = datetime.fromisoformat(week_start_str).date()
+    week_end = week_start + timedelta(days=6)
+
+    # Chuyen tat ca shifts nhap thanh final
+    updated = ScheduleShift.query.filter(
+        ScheduleShift.date >= week_start,
+        ScheduleShift.date <= week_end,
+        ScheduleShift.shift_source == 'system',
+        ScheduleShift.draft_status == 'draft'
+    ).update({'draft_status': 'final', 'is_confirmed': True})
+
+    db.session.commit()
+
+    # Xoa session
+    session.pop('selected_staff_ids', None)
+    session.pop('auto_week_start', None)
+
+    flash(f'Da luu {updated} ca lam viec thanh chinh thuc!', 'success')
+    return redirect(url_for('schedule.final_review'))
+
+
+@bp.route('/discard-draft', methods=['POST'])
+@login_required
+@manager_required
+def discard_draft():
+    """Huy bo lich nhap"""
+    week_start_str = session.get('auto_week_start')
+
+    if week_start_str:
+        week_start = datetime.fromisoformat(week_start_str).date()
+        week_end = week_start + timedelta(days=6)
+
+        # Xoa tat ca shifts nhap
+        deleted = ScheduleShift.query.filter(
+            ScheduleShift.date >= week_start,
+            ScheduleShift.date <= week_end,
+            ScheduleShift.shift_source == 'system',
+            ScheduleShift.draft_status == 'draft'
+        ).delete()
+
+        db.session.commit()
+
+        # Xoa session
+        session.pop('selected_staff_ids', None)
+        session.pop('auto_week_start', None)
+
+        flash(f'Da huy {deleted} ca lich nhap!', 'info')
+
+    return redirect(url_for('schedule.review'))
+
+
+@bp.route('/remove-draft-shift', methods=['POST'])
+@login_required
+@manager_required
+def remove_draft_shift():
+    """Xoa 1 shift khoi lich nhap"""
+    data = request.get_json() or request.form
+    shift_id = data.get('shift_id')
+
+    if shift_id:
+        shift = ScheduleShift.query.filter_by(
+            id=shift_id,
+            shift_source='system',
+            draft_status='draft'
+        ).first()
+
+        if shift:
+            db.session.delete(shift)
+            db.session.commit()
+            return jsonify({'success': True})
+
+    return jsonify({'success': False, 'error': 'Khong tim thay shift'})
+
+
+@bp.route('/add-draft-shift', methods=['POST'])
+@login_required
+@manager_required
+def add_draft_shift():
+    """Them 1 shift vao lich nhap"""
+    data = request.get_json() or request.form
+    user_id = data.get('user_id', type=int) if hasattr(data, 'get') else int(data.get('user_id', 0))
+    date_str = data.get('date')
+    shift_type_str = data.get('shift_type')
+
+    if not all([user_id, date_str, shift_type_str]):
+        return jsonify({'success': False, 'error': 'Thieu thong tin'})
+
+    try:
+        shift_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        shift_type = ShiftType(shift_type_str)
+        shift_start, shift_end = SHIFT_TIMES[shift_type]
+
+        # Tim hoac tao WorkSchedule
+        week_start = shift_date - timedelta(days=shift_date.weekday())
+        week_end = week_start + timedelta(days=6)
+
+        schedule = WorkSchedule.query.filter_by(
+            user_id=user_id,
+            week_start_date=week_start
+        ).first()
+
+        if not schedule:
+            schedule = WorkSchedule(
+                user_id=user_id,
+                week_start_date=week_start,
+                week_end_date=week_end,
+                status=ScheduleStatus.SUBMITTED,
+                submitted_at=datetime.now()
+            )
+            db.session.add(schedule)
+            db.session.flush()
+
+        # Kiem tra shift da ton tai chua
+        existing = ScheduleShift.query.filter_by(
+            schedule_id=schedule.id,
+            date=shift_date,
+            shift_type=shift_type,
+            shift_source='system',
+            draft_status='draft'
+        ).first()
+
+        if existing:
+            return jsonify({'success': False, 'error': 'NV nay da co trong ca nay'})
+
+        # Tao shift moi
+        shift = ScheduleShift(
+            schedule_id=schedule.id,
+            date=shift_date,
+            shift_type=shift_type,
+            shift_start_time=shift_start,
+            shift_end_time=shift_end,
+            is_preferred=False,
+            is_confirmed=False,
+            shift_source='system',
+            draft_status='draft'
+        )
+        db.session.add(shift)
+        db.session.commit()
+
+        user = User.query.get(user_id)
+        return jsonify({
+            'success': True,
+            'shift_id': shift.id,
+            'user_name': user.full_name if user else 'Unknown'
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@bp.route('/final-review')
+@login_required
+@manager_required
+def final_review():
+    """Buoc 5: Xem lich final va day ve nhan vien"""
+    week_start, week_end = get_next_week_dates()
+
+    # Lay lich final (da luu)
+    final_shifts = db.session.query(ScheduleShift, User)\
+        .select_from(ScheduleShift)\
+        .join(WorkSchedule, ScheduleShift.schedule_id == WorkSchedule.id)\
+        .join(User, WorkSchedule.user_id == User.id)\
+        .filter(
+            ScheduleShift.date >= week_start,
+            ScheduleShift.date <= week_end,
+            ScheduleShift.is_confirmed == True
+        )\
+        .order_by(ScheduleShift.date, ScheduleShift.shift_type)\
+        .all()
+
+    # To chuc theo ngay va ca
+    schedule_by_date = {}
+    for i in range(7):
+        date = week_start + timedelta(days=i)
+        schedule_by_date[date] = {
+            'morning': [],
+            'afternoon': [],
+            'evening': []
+        }
+
+    for shift, user in final_shifts:
+        shift_type = shift.shift_type.value
+        if shift.date in schedule_by_date:
+            schedule_by_date[shift.date][shift_type].append({
+                'shift': shift,
+                'user': user
+            })
+
+    # Kiem tra da publish chua
+    schedules = WorkSchedule.query.filter_by(
+        week_start_date=week_start,
+        status=ScheduleStatus.APPROVED
+    ).all()
+    is_published = len(schedules) > 0
+
+    return render_template('schedule/final_review.html',
+                           schedule_by_date=schedule_by_date,
+                           week_start=week_start,
+                           week_end=week_end,
+                           total_shifts=len(final_shifts),
+                           is_published=is_published,
+                           timedelta=timedelta)
+
+
+@bp.route('/publish-to-staff', methods=['POST'])
+@login_required
+@admin_required
+def publish_to_staff():
+    """Day lich ve cho nhan vien"""
+    week_start, week_end = get_next_week_dates()
+
+    # Update trang thai WorkSchedule thanh APPROVED
+    schedules = WorkSchedule.query.filter(
+        WorkSchedule.week_start_date == week_start,
+        WorkSchedule.status.in_([ScheduleStatus.SUBMITTED, ScheduleStatus.DRAFT])
+    ).all()
+
+    for schedule in schedules:
+        schedule.status = ScheduleStatus.APPROVED
+        schedule.approved_at = datetime.now()
+        schedule.approved_by = current_user.id
+        # Confirm tat ca shifts cua schedule nay
+        for shift in schedule.shifts:
+            shift.is_confirmed = True
+
+    db.session.commit()
+
+    flash(f'Da day lich ve cho {len(schedules)} nhan vien!', 'success')
+    return redirect(url_for('schedule.final_review'))

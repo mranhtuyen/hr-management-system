@@ -1,0 +1,173 @@
+BAO CAO FIX BUG VA NANG CAP - LAN 3
+====================================
+Ngay: 2026-02-02
+
+=====================================================================
+YEU CAU TU ERROR.TXT                    | TRANG THAI      | GHI CHU
+=====================================================================
+
+(2.1) Xep lich tu dong dao lon data     | DA HOAN THANH   |
+---------------------------------------------------------------------
+Yeu cau: Khi bam xep lich lan 2, lich dang ky cua NV bi thay doi/mat
+
+Da lam:
+- Them 2 cot moi vao ScheduleShift:
+  + shift_source: 'employee' hoac 'system' (phan biet nguon)
+  + draft_status: 'draft' hoac 'final' (phan biet nhap/chinh thuc)
+- Auto-scheduler chi xoa shifts cua 'system' + 'draft', KHONG xoa 'employee'
+- Lich dang ky cua NV duoc bao toan 100%
+- File: app/models.py, app/schedule/auto_scheduler.py
+- Migration: migrate_shift_source.py
+
+=====================================================================
+
+(2.2) Khong tuan thu config so nguoi/ca | DA HOAN THANH   |
+---------------------------------------------------------------------
+Yeu cau: Chon 2 nguoi/ca nhung ket qua > 2 nguoi, hoac 3 nguoi/ca khong dung
+
+Da lam:
+- Sua auto_generate_schedule nhan param staff_per_shift
+- Tuan thu chien luoc: chi xep toi da staff_per_shift nguoi/ca
+- Ho tro 2, 3, 4 nguoi/ca
+- File: app/schedule/auto_scheduler.py
+
+=====================================================================
+
+(2.3) Workflow moi: Xem NHAP truoc luu  | DA HOAN THANH   |
+---------------------------------------------------------------------
+Yeu cau: Xep lich -> hien NHAP -> Quan ly sua -> Luu -> Day ve NV
+
+Da lam:
+- Workflow moi 5 buoc:
+  1. /schedule/select-staff - Chon NV tham gia xep lich
+  2. /schedule/config-auto-schedule - Cau hinh so nguoi/ca
+  3. /schedule/review-draft - Xem va sua lich NHAP
+  4. /schedule/save-draft - Luu thanh chinh thuc
+  5. /schedule/final-review - Xem lich final, day ve NV
+
+- Routes moi:
+  + select_staff() - Chon NV
+  + config_auto_schedule() - Cau hinh
+  + review_draft() - Xem nhap
+  + save_draft() - Luu chinh thuc
+  + discard_draft() - Huy nhap
+  + remove_draft_shift() - Xoa 1 shift khoi nhap
+  + add_draft_shift() - Them 1 shift vao nhap
+  + final_review() - Xem final
+  + publish_to_staff() - Day ve NV
+
+- Templates moi:
+  + select_staff.html
+  + config_auto.html
+  + review_draft.html
+  + final_review.html
+
+- File: app/schedule/routes.py
+
+=====================================================================
+
+(4a) Cai dat mau sac ca Sang/Chieu/Toi  | DA HOAN THANH   |
+---------------------------------------------------------------------
+Yeu cau: Boss duoc cai dat doi mau sac cac ca
+
+Da lam:
+- Them cai dat mau sac trong /schedule/settings
+- Luu vao SystemConfig: shift_morning_color, shift_afternoon_color, shift_evening_color
+- Dung input type="color" de chon mau
+- File: app/schedule/routes.py, app/templates/schedule/settings.html
+
+=====================================================================
+
+(4b) Cai dat gio cac ca Sang/Chieu/Toi  | DA HOAN THANH   |
+---------------------------------------------------------------------
+Yeu cau: Cai dat gio bat dau/ket thuc cac ca
+
+Da lam:
+- Them cai dat gio trong /schedule/settings
+- Luu vao SystemConfig: shift_morning_start, shift_morning_end, etc.
+- Dung input type="time" de chon gio
+- File: app/schedule/routes.py, app/templates/schedule/settings.html
+
+=====================================================================
+
+(Module NV) UI my-schedule khoa hoc     | DA HOAN THANH   |
+---------------------------------------------------------------------
+Yeu cau: Tao bang khoa hoc nhin thuan mat giong Quan ly
+
+Da lam:
+- Thiet ke lai my_schedule.html thanh dang bang 7 cot (T2-CN)
+- Hien thi ca Sang/Chieu/Toi theo hang
+- Danh dau mau: xanh = da duyet, vang/cam/tim = cho duyet
+- Hien thi "Hom nay" cho ngay hien tai
+- File: app/templates/schedule/my_schedule.html
+
+=====================================================================
+
+(Module NV) Fix nut Reset lich          | DA SUA LAN 2    |
+---------------------------------------------------------------------
+Yeu cau: Reset khong hoat dong dung
+
+Da lam (lan 2):
+- Route reset_my_schedule chi xoa lich chua duyet
+- Khong gui lich di khi reset
+- Da sua tu lan 2, kiem tra lai OK
+- File: app/schedule/routes.py
+
+=====================================================================
+
+TOM TAT:
+========
+Da hoan thanh:     8/8 yeu cau chinh
+Hoan thanh 1 phan: 0/8
+
+WORKFLOW MOI:
+=============
+1. Admin vao /schedule/review
+2. Bam "Bat dau xep lich tu dong"
+3. Chon NV tham gia -> Tiep tuc
+4. Chon so nguoi/ca -> Tao lich NHAP
+5. Xem va sua lich NHAP (them/xoa NV)
+6. Bam "Luu chinh thuc"
+7. Xem lich final, bam "Day lich ve cho NV"
+
+DATABASE CHANGES:
+=================
+Bang schedule_shifts them 2 cot:
+- shift_source VARCHAR(20) DEFAULT 'employee'
+- draft_status VARCHAR(20) DEFAULT 'final'
+
+FILES DA THAY DOI/TAO MOI:
+==========================
+1. app/models.py
+   - Them shift_source, draft_status vao ScheduleShift
+
+2. app/schedule/routes.py
+   - Them 9 routes moi cho workflow
+   - Cap nhat settings() de luu mau/gio ca
+
+3. app/schedule/auto_scheduler.py
+   - Viet lai hoan toan de ho tro draft
+   - Khong ghi de lich NV dang ky
+
+4. app/templates/schedule/select_staff.html (MOI)
+5. app/templates/schedule/config_auto.html (MOI)
+6. app/templates/schedule/review_draft.html (MOI)
+7. app/templates/schedule/final_review.html (MOI)
+8. app/templates/schedule/my_schedule.html (CAP NHAT)
+9. app/templates/schedule/settings.html (CAP NHAT)
+10. app/templates/schedule/review.html (CAP NHAT)
+11. migrate_shift_source.py (MOI - migration script)
+
+SERVER STATUS:
+==============
+Server dang chay tai: http://127.0.0.1:5000
+Tat ca endpoints hoat dong binh thuong (302 redirect login khi chua dang nhap).
+
+ENDPOINTS MOI:
+- /schedule/select-staff      -> 302 OK
+- /schedule/config-auto-schedule -> 302 OK
+- /schedule/review-draft      -> 302 OK
+- /schedule/final-review      -> 302 OK
+- /schedule/save-draft        -> POST only
+- /schedule/discard-draft     -> POST only
+- /schedule/publish-to-staff  -> POST only

@@ -153,6 +153,10 @@ class ScheduleShift(db.Model):
     is_confirmed = db.Column(db.Boolean, default=False)  # Da duoc duyet
     is_and_condition = db.Column(db.Boolean, default=False)  # "va" hay "hoac"
 
+    # THEM 2 COT MOI de phan biet lich NV dang ky va lich he thong xep
+    shift_source = db.Column(db.String(20), default='employee')  # 'employee' hoac 'system'
+    draft_status = db.Column(db.String(20), default='final')     # 'draft' hoac 'final'
+
     def __repr__(self):
         return f'<ScheduleShift {self.date} - {self.shift_type.value}>'
 

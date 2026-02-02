@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Cau hinh xep lich - HR System{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800">Buoc 2: Cau hinh xep lich tu dong</h1>
+        <span class="text-gray-600">Tuan: {{ week_start.strftime('%d/%m') }} - {{ week_end.strftime('%d/%m/%Y') }}</span>
+    </div>
+
+    <div class="bg-blue-50 border-l-4 border-blue-500 p-4">
+        <p class="text-blue-700">
+            Da chon: <strong>{{ selected_count }}</strong> nhan vien
+        </p>
+    </div>
+
+    <form method="POST" class="bg-white rounded-lg shadow p-6">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="mb-6">
+            <label class="block text-lg font-bold mb-4 text-gray-800">So nhan vien moi ca:</label>
+
+            <div class="space-y-3">
+                <label class="block p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                    <input type="radio" name="staff_per_shift" value="2" checked class="mr-3 w-5 h-5">
+                    <span class="font-semibold">2 nguoi/ca (co dinh)</span>
+                    <p class="text-sm text-gray-600 ml-8">Moi ca se co dung 2 nhan vien</p>
+                </label>
+
+                <label class="block p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                    <input type="radio" name="staff_per_shift" value="3" class="mr-3 w-5 h-5">
+                    <span class="font-semibold">3 nguoi/ca (co dinh)</span>
+                    <p class="text-sm text-gray-600 ml-8">Moi ca se co dung 3 nhan vien</p>
+                </label>
+
+                <label class="block p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                    <input type="radio" name="staff_per_shift" value="4" class="mr-3 w-5 h-5">
+                    <span class="font-semibold">4 nguoi/ca (co dinh)</span>
+                    <p class="text-sm text-gray-600 ml-8">Moi ca se co dung 4 nhan vien</p>
+                </label>
+            </div>
+        </div>
+
+        <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-6">
+            <p class="text-yellow-700 font-semibold mb-2">Luu y:</p>
+            <ul class="text-sm text-yellow-600 list-disc ml-5 space-y-1">
+                <li>Ket qua se la <strong>LICH NHAP</strong>, chua luu chinh thuc</li>
+                <li>Ban co the xem va sua truoc khi luu</li>
+                <li>Lich dang ky cua nhan vien <strong>KHONG bi thay doi</strong></li>
+            </ul>
+        </div>
+
+        <div class="flex gap-4">
+            <button type="submit" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold"
+                onclick="return confirm('Xac nhan tao lich NHAP voi cau hinh nay?');">
+                Tao lich NHAP
+            </button>
+            <a href="{{ url_for('schedule.select_staff') }}" class="px-6 py-3 bg-gray-300 rounded-lg hover:bg-gray-400 transition">
+                Quay lai chon nhan vien
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Chon nhan vien xep lich - HR System{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-800">Buoc 1: Chon nhan vien tham gia xep lich</h1>
+        <span class="text-gray-600">Tuan: {{ week_start.strftime('%d/%m') }} - {{ week_end.strftime('%d/%m/%Y') }}</span>
+    </div>
+
+    <div class="bg-blue-50 border-l-4 border-blue-500 p-4">
+        <p class="text-blue-700">
+            Chon cac nhan vien se duoc xep lich tu dong.<br>
+            Tong nhan vien da dang ky: <strong>{{ schedules|length }}</strong>
+        </p>
+    </div>
+
+    <form method="POST" class="bg-white rounded-lg shadow p-6">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        {% if schedules %}
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-center w-16">
+                            <input type="checkbox" id="selectAll" class="w-5 h-5"
+                                onchange="document.querySelectorAll('[name=staff_ids]').forEach(cb => cb.checked = this.checked)">
+                        </th>
+                        <th class="px-4 py-3 text-left">Nhan vien</th>
+                        <th class="px-4 py-3 text-left">Loai</th>
+                        <th class="px-4 py-3 text-center">So ca dang ky</th>
+                        <th class="px-4 py-3 text-left">Thoi gian gui</th>
+                        <th class="px-4 py-3 text-left">Trang thai</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    {% for schedule in schedules %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 text-center">
+                            <input type="checkbox" name="staff_ids" value="{{ schedule.user.id }}"
+                                class="w-5 h-5" checked>
+                        </td>
+                        <td class="px-4 py-3 font-semibold">{{ schedule.user.full_name }}</td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-1 rounded text-xs
+                                {% if schedule.user.employment_type.value == 'full_time' %}bg-blue-100 text-blue-800
+                                {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                                {% if schedule.user.employment_type.value == 'full_time' %}Full-time{% else %}Part-time{% endif %}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-center">{{ schedule.shifts|length }} ca</td>
+                        <td class="px-4 py-3 text-sm text-gray-600">
+                            {{ schedule.submitted_at.strftime('%d/%m %H:%M') if schedule.submitted_at else '-' }}
+                        </td>
+                        <td class="px-4 py-3">
+                            {% if schedule.status.value == 'approved' %}
+                            <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">Da duyet</span>
+                            {% else %}
+                            <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">Cho duyet</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mt-6 flex gap-4">
+            <button type="submit" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold">
+                Tiep tuc: Cau hinh xep lich
+            </button>
+            <a href="{{ url_for('schedule.review') }}" class="px-6 py-3 bg-gray-300 rounded-lg hover:bg-gray-400 transition">
+                Huy
+            </a>
+        </div>
+        {% else %}
+        <div class="p-8 text-center">
+            <p class="text-gray-500 text-lg">Chua co nhan vien nao dang ky lich tuan nay.</p>
+            <a href="{{ url_for('schedule.review') }}" class="mt-4 inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                Quay lai
+            </a>
+        </div>
+        {% endif %}
+    </form>
+</div>
+{% endblock %}
