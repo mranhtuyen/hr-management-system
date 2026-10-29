@@ -181,49 +181,18 @@ Reward.created_at < (datetime(...) if month < 12 else datetime(...))
 - Khi luu lich moi: XOA shifts final cu truoc
 - Export Excel: Chi lay is_confirmed=True, loai bo duplicate theo shift_type
 
-## Cac bug da fix gan day
-
-### Session 2026-02-02
-
-1. **SQLAlchemy ArgumentError** trong payroll detail
-   - Nguyen nhan: Ternary expression thieu dau ngoac
-   - Fix: Tach datetime calculation ra bien rieng
-
-2. **Cai dat mau sac/gio ca khong ap dung**
-   - Nguyen nhan: Code dung SHIFT_TIMES hardcoded
-   - Fix: Tao get_shift_settings(), get_dynamic_shift_times()
-
-3. **Xep lich tu dong luon nhay sang tuan sau**
-   - Fix: Them week_offset parameter cho select_staff()
-
-4. **Xem cham cong thieu chuc nang Sua/Xoa**
-   - Fix: Them routes update_record(), delete_record()
-
-5. **Excel xuat du lieu trung lap**
-   - Nguyen nhan: Moi lan luu them moi, khong xoa cu
-   - Fix: save_draft() xoa final shifts cu truoc khi luu
-
-6. **Them NV vao ca bao "Loi ket noi!"**
-   - Nguyen nhan: Parse JSON data sai (dict.get() khong co type)
-   - Fix: Dung request.is_json va int(data.get())
-
-7. **Them ca lam viec bao "da ton tai"**
-   - Nguyen nhan: Check qua strict, bao gom ca draft
-   - Fix: Chi check confirmed shifts
-
-8. **Deadline dang ky khong hoat dong**
-   - Nguyen nhan: Logic chi cho dang ky vao Thu 6 + ngay deadline
-   - Fix: Cho phep dang ky bat ky ngay nao truoc deadline
-
-9. **NV khong dang ky duoc tuan ke tiep**
-   - Nguyen nhan: Block khi tuan hien tai approved
-   - Fix: Tu dong chuyen sang dang ky tuan tiep theo
+## Quy tac lam viec (tiet kiem token)
+- `app/schedule/routes.py` ~1400 dong: KHONG doc ca file. Dung grep tim ten ham/route roi doc dung doan (offset/limit).
+- Tim kiem rong nhieu file -> giao subagent `finder` (Haiku).
+- Lich su bug da fix nam o `bug/lich_su_fix.md` - chi doc khi can tra cuu.
+- Sau moi lan fix bug: them 1-2 dong (nguyen nhan + fix) vao dau `bug/lich_su_fix.md`.
+- Phat hien quy uoc/bay moi dang nho (vd loi lap lai) -> them vao muc "Luu y quan trong khi code" o tren.
 
 ## Thu muc bug reports
 `bug/` - Chua file bao loi (.docx, .txt) va file mau (.xlsx)
 - Error.txt: Danh sach loi can fix
 - excel.txt: Mau du lieu export bi trung lap
-- bao_cao_fix_lanX.txt: Lich su fix bug
+- bao_cao_fix_lanX.txt, lich_su_fix.md: Lich su fix bug
 
 ## Git workflow
 ```bash
@@ -240,5 +209,5 @@ Chi tiet thay doi...
 Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 
 # Push
-git push origin main
+git push origin master
 ```
